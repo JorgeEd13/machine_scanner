@@ -13,8 +13,14 @@ import argparse
 import sys
 
 from . import __version__
+from .core.models import Status
 from .core.registry import available, run_all
 from .report import to_html, to_json, to_text
+
+# Exit codes: 0 = clean, 2 = at least one collector hit a genuine bug (ERROR).
+# Expected gaps (PARTIAL / UNAVAILABLE / UNSUPPORTED) are not failures.
+EXIT_OK = 0
+EXIT_COLLECTOR_ERROR = 2
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -45,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.list:
         print("\n".join(available()))
-        return 0
+        return EXIT_OK
 
     only = [s.strip() for s in args.only.split(",")] if args.only else None
     inventory = run_all(only=only)
@@ -68,7 +74,8 @@ def main(argv: list[str] | None = None) -> int:
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
         print(rendered)
 
-    return 0
+    errored = any(s.status is Status.ERROR for s in inventory.sections)
+    return EXIT_COLLECTOR_ERROR if errored else EXIT_OK
 
 
 if __name__ == "__main__":

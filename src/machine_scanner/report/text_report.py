@@ -1,8 +1,15 @@
-"""Plain-text renderer — the default, human-readable console report."""
+"""Plain-text renderer — the default, human-readable console report.
+
+The data a collector returns is arbitrarily nested (a network interface holds a
+list of address dicts; a disk holds a list of partition dicts). The renderer is
+fully recursive so any depth stays readable as an indented outline instead of a
+Python ``repr`` — lists of records are separated by blank lines, scalars in a
+record print as ``key: value``, and an empty list prints ``(none)``.
+"""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 from ..core.models import Inventory, Status
 
@@ -14,20 +21,47 @@ _STATUS_MARK = {
     Status.ERROR: "[error]",
 }
 
+_STEP = 2  # spaces added per nesting level
 
-def _render_value(value: Any, indent: int) -> list[str]:
-    """Render a single value, recursing into lists of dicts (e.g. partitions)."""
+
+def _is_mapping(value: Any) -> bool:
+    return isinstance(value, Mapping)
+
+
+def _is_list(value: Any) -> bool:
+    # str/bytes are Sequences too — exclude them, they are scalars here.
+    return isinstance(value, Sequence) and not isinstance(value, (str, bytes))
+
+
+def _render_mapping(mapping: Mapping[str, Any], indent: int) -> list[str]:
+    """Render a dict as ``key: value`` lines, recursing into nested containers."""
     pad = " " * indent
     lines: list[str] = []
-    if isinstance(value, list):
+    for key, value in mapping.items():
+        if _is_mapping(value) or _is_list(value):
+            lines.append(f"{pad}{key}:")
+            lines.extend(_render_value(value, indent + _STEP))
+        else:
+            lines.append(f"{pad}{key}: {value}")
+    return lines
+
+
+def _render_value(value: Any, indent: int) -> list[str]:
+    """Render any value, recursing into nested lists/dicts to arbitrary depth."""
+    pad = " " * indent
+    lines: list[str] = []
+    if _is_mapping(value):
+        lines.extend(_render_mapping(value, indent))
+    elif _is_list(value):
         if not value:
             lines.append(f"{pad}(none)")
         for i, item in enumerate(value):
-            if isinstance(item, dict):
-                if i:
+            if _is_mapping(item):
+                if i:  # blank line between records keeps a list of dicts scannable
                     lines.append("")
-                for k, v in item.items():
-                    lines.append(f"{pad}{k}: {v}")
+                lines.extend(_render_mapping(item, indent))
+            elif _is_list(item):
+                lines.extend(_render_value(item, indent))
             else:
                 lines.append(f"{pad}- {item}")
     else:
@@ -50,12 +84,7 @@ def to_text(inventory: Inventory) -> str:
         out.append("")
         mark = _STATUS_MARK.get(sec.status, "")
         out.append(f"[{sec.title}] {mark}")
-        for key, value in sec.data.items():
-            if isinstance(value, (list, dict)):
-                out.append(f"  {key}:")
-                out.extend(_render_value(value, indent=4))
-            else:
-                out.append(f"  {key}: {value}")
+        out.extend(_render_mapping(sec.data, indent=2))
         for note in sec.notes:
             # keep tracebacks (multi-line) readable, indent the first line only
             out.append(f"  ! {note.splitlines()[0]}")

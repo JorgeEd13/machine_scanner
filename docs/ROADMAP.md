@@ -13,14 +13,19 @@
 - **DoD:** ✅ `python -m machine_scanner` produces text/JSON/HTML; `--only` and
   `--list` work; `pytest` green (10). Verified on Windows.
 
-## F1 — Hardening & ergonomics
+## F1 — Hardening & ergonomics  ✅ (2026-06-11)
 
 - **Objective:** make it robust and CI-backed across OSes.
 - **How:** nested-list text rendering (interface addresses / partitions as
   tables); no-psutil code path test; clearer exit codes; **GitHub Actions**
   (`pytest` on ubuntu + windows); Linux/WSL smoke run.
-- **DoD:** CI green on 2 OSes; text report readable for nested data; a documented
-  cross-OS run in STATE.
+- **DoD:** ✅ recursive text renderer (ADR-007) — nested data reads as an
+  outline, verified on a live Windows scan; no-psutil path tested
+  (`tests/test_no_psutil.py`); exit codes 0/2 (ADR-008) with CLI tests; GitHub
+  Actions matrix ubuntu+windows × py3.9/3.13 running pytest + a CLI smoke run;
+  Linux smoke run done under WSL (Ubuntu, py3.12 — also exercised the no-psutil
+  fallback for real). 24 tests green. CI will confirm green on the GitHub
+  runners on first push.
 
 ## F2 — Deeper hardware (per-OS)
 

@@ -67,3 +67,29 @@ no remote/fleet mode.
 **Consequences.** The tool stays unambiguously a benign diagnostic utility,
 which matters for a public portfolio piece. Fleet aggregation, if ever wanted,
 would be a separate project consuming the JSON output.
+
+## ADR-007 — Fully recursive text renderer
+
+**Context.** Collector data is arbitrarily nested (a network interface holds a
+list of address dicts; that is a list-inside-a-dict-inside-a-list). The first
+text renderer only descended one level, so nested lists printed as a raw Python
+`repr` — unreadable, while JSON/HTML were fine.
+**Decision.** Make the text renderer fully recursive (`_render_value` /
+`_render_mapping`) to any depth: dicts print as `key: value`, lists of records
+are separated by blank lines, empty lists print `(none)`. `str`/`bytes` are
+explicitly treated as scalars (they are `Sequence`s) so a string never explodes
+into one line per character.
+**Consequences.** The text report is now the equal of JSON/HTML for nested data
+with no per-collector formatting code. Renderer stays generic — new collectors
+inherit readable output for free.
+
+## ADR-008 — Exit codes distinguish bugs from expected gaps
+
+**Context.** A script wrapping the tool needs to know whether a scan actually
+*failed* versus simply found nothing (no GPU, no swap, psutil absent).
+**Decision.** Exit `0` on a clean run; exit `2` only when at least one section
+is `ERROR` (a collector raised — a genuine bug). `partial` / `unavailable` /
+`unsupported` are expected outcomes and keep exit `0`.
+**Consequences.** CI and shell callers get a meaningful signal that mirrors the
+`Status` enum (ADR-004) without parsing output. Expected hardware gaps never
+trip an automated check.

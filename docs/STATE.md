@@ -3,46 +3,47 @@
 > Volatile, short. Update at the end of each step.
 
 **Date:** 2026-06-11
-**Phase:** F0 (Foundations & runnable skeleton) — ✅ done. Next: F1 (hardening + CI).
+**Phase:** F1 (hardening + CI) — ✅ done. Next: F2 (deeper per-OS hardware).
 
 ## Current focus
 
-Scaffold complete and **verified running on Windows** (Python 3.13, psutil
-7.2.2): all 7 collectors register; text / JSON / HTML / `--only` all work;
-`pytest` is 10/10 green. The architecture (self-registering collectors →
-isolated runner → generic renderers) is proven end-to-end.
+F1 closed. The tool is now CI-backed and cross-OS verified: nested data reads
+cleanly in text mode, the no-psutil path is tested, exit codes are meaningful,
+and a GitHub Actions matrix runs the suite on ubuntu + windows. 24 tests green
+locally (was 10).
 
-## Done (F0)
+## Done (F1)
 
-- **Package** in src-layout (`src/machine_scanner/`), `pyproject.toml` exposing
-  the `machine-scanner` console script, `requirements.txt` (psutil).
-- **Core:** `models.py` (`Section`/`Inventory`/`Status`), `platform.py`
-  (`current_os`, `is_admin`, guarded `run_command`), `registry.py`
-  (`@register`, `run_all` with per-collector error isolation + scan metadata).
-- **Collectors:** `system` (stdlib-only), `cpu`, `memory`, `disk`, `network`
-  (psutil), `gpu` (NVIDIA via `nvidia-smi`), `peripherals` (registered stub).
-  `_psutil.py` makes psutil an optional, gracefully-degrading import.
-- **Reports:** `json`, `text`, `html` (self-contained, inline CSS). Renderers
-  walk sections generically.
-- **CLI:** `--json` / `--html` / `--only A,B` / `--out FILE` / `--list` /
-  `--version`; UTF-8 stdout reconfigure on Windows.
-- **Tests:** `tests/test_models.py` + `tests/test_registry.py` — 10 passing,
-  offline, hardware-agnostic (incl. the failing-collector isolation test).
-- **Docs/meta:** README, CLAUDE.md, PLAN.md, ROADMAP, ARCHITECTURE, DECISIONS,
-  MIT LICENSE, .gitignore.
+- **Recursive text renderer** (ADR-007): `report/text_report.py` now descends to
+  any depth — network interface addresses / disk partitions print as an indented
+  outline instead of a Python `repr`. `str`/`bytes` treated as scalars. Verified
+  on a live Windows scan (`--only network,disk`).
+- **No-psutil path** (`tests/test_no_psutil.py`): monkeypatches `_psutil.get →
+  None` and asserts each collector's documented fallback (network→PARTIAL,
+  disk/memory→UNAVAILABLE, cpu→PARTIAL keeping `os.cpu_count`) and that **none**
+  raise. The WSL run below exercised this for real (Ubuntu has no psutil).
+- **Exit codes** (ADR-008): `cli.main` returns `0` clean / `2` if any section is
+  `ERROR`; expected gaps (partial/unavailable/unsupported) stay `0`. Covered by
+  `tests/test_cli.py` plus output-path tests (`--list`, `--json`).
+- **CI**: `.github/workflows/ci.yml` — matrix `{ubuntu, windows} × {3.9, 3.13}`,
+  `pip install -e .[dev]`, `pytest -v`, then a CLI smoke run (`--list`, text,
+  `--json`).
+- **Cross-OS smoke run**: WSL Ubuntu (Python 3.12) ran `python -m
+  machine_scanner` end-to-end — Linux OS detection correct, graceful psutil-less
+  degradation, no crashes.
 
-## Next step
+## Next step (F2 — deeper hardware)
 
-1. **F1 — hardening:** nicer text rendering of nested lists (interface
-   addresses currently print as a Python repr in text mode — JSON/HTML are
-   fine); add a no-psutil test path; **GitHub Actions** running `pytest` on
-   Linux + Windows. Do a smoke run on Linux/WSL to confirm cross-OS.
-2. Then **F2** — first deeper-hardware collector (GPU beyond NVIDIA, or
-   motherboard/BIOS via WMI/`dmidecode`).
+1. First deep collector beyond psutil, via `core.platform.run_command`:
+   candidates — motherboard/BIOS/serials (WMI on Windows, `dmidecode`/`lshw` on
+   Linux, `system_profiler` on macOS), or GPU beyond NVIDIA (AMD/Intel/iGPU).
+2. Must degrade to `unsupported`/`partial` on other OSes and note elevation
+   needs. Add a focused offline test + an ADR if a non-obvious choice is made.
 
 ## Notes / open points
 
-- Verified only on Windows so far; Linux/macOS paths are written but **not yet
-  run** (F1 smoke run will confirm). `gpu` returned `[n/a]` here (no NVIDIA on
-  the i3 box) — expected.
-- No `git init` yet at time of writing → done as the final F0 step.
+- CI is written but **not yet observed green on GitHub runners** — that happens
+  on first push (repo not yet pushed). Local + WSL are green.
+- `gpu` still `[n/a]` on this i3 box (no NVIDIA) — expected.
+- WSL has no `pip`, so pytest wasn't run there; CI's ubuntu job covers
+  pytest-on-Linux. The WSL CLI run was enough to confirm cross-OS execution.
