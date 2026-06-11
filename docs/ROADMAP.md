@@ -48,18 +48,34 @@
 ## F3 — Peripherals & extras  ✅ (2026-06-11)
 
 - **Objective:** flesh out the registered `peripherals` stub.
-- **How:** USB devices, monitors, input devices, battery/sensors — per-OS
-  enumeration following the F2 pattern.
-- **DoD:** ✅ `peripherals` returns real data on each OS (or honest gap). The
-  stub is now a real **USB devices** collector (ADR-011): Windows
-  `Win32_PnPEntity` (CIM), Linux `lsusb` → `/sys/bus/usb` fallback, macOS
-  `SPUSBDataType`; normalized to a flat `{name, vendor_id, product_id,
-  manufacturer}` list keyed by VID:PID; no elevation needed; degrades to a clean
-  `unavailable` (verified live on Windows + WSL2 smoke). 108 tests green.
-- **Follow-ups (same dispatch shape, optional):** monitors (`WmiMonitorID`/EDID
-  · `/sys/class/drm/*/edid` · `SPDisplaysDataType`), battery (`Win32_Battery` ·
-  `/sys/class/power_supply` · `pmset`), input devices. New categories add a key
-  to the `peripherals` section rather than a new collector.
+- **How:** USB devices, monitors, input devices, battery, audio — per-OS
+  enumeration following the F2 pattern, **each its own sibling collector**
+  (ADR-012), not one grouped section.
+- **DoD:** ✅ five real peripheral sections, each returning real data per OS (or
+  an honest gap), verified live on Windows + WSL2 smoke. 143 tests green.
+  - **`usb`** (ADR-011): `Win32_PnPEntity` / `lsusb`→sysfs / `SPUSBDataType`,
+    flat list keyed by VID:PID. (Renamed from the F3-initial `peripherals`.)
+  - **`monitors`**: `WmiMonitorID` / raw EDID parse of `/sys/class/drm/*/edid`
+    / `SPDisplaysDataType` — manufacturer PnP-ID, product code, serial, name.
+  - **`battery`**: `Win32_Battery` / `/sys/class/power_supply/BAT*` (+ health %)
+    / `SPPowerDataType` — degrades to an accurate `no battery present`.
+  - **`input`**: `Win32_Keyboard`+`Win32_PointingDevice` / `/proc/bus/input/
+    devices` / macOS `unsupported`.
+  - **`audio`**: `Win32_SoundDevice` / `/proc/asound/cards` / `SPAudioDataType`.
+- **Queued extras (same pattern, not yet built):** **Bluetooth** (`Win32_PnPEntity`
+  BT class · `bluetoothctl` · `SPBluetoothDataType`) and **printers**
+  (`Win32_Printer` · `lpstat` · `SPPrintersDataType`).
+
+## F2.x — Physical storage drives  ⬜ (recorded gap)
+
+- **Objective:** close the deep-hardware gap `disk` leaves — `disk` reports
+  psutil partitions/usage only, not the physical drives.
+- **How:** a `storage_devices` collector for drive **model / serial / firmware /
+  bus type (SSD/HDD/NVMe) / SMART health** — `Win32_DiskDrive` (Windows),
+  `lsblk -O`/`/sys/block` (Linux), `diskutil`/`SPNVMeDataType` (macOS), same
+  per-OS judgement as ADR-009/010.
+- **DoD:** physical drives enumerated per OS with graceful degrade; SMART health
+  where readable (note elevation if needed).
 
 ## F4 — Richer HTML report
 

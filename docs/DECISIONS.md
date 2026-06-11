@@ -200,3 +200,38 @@ roadmap placeholder. Verified live on Windows (Logitech receiver, a SanDisk mass
 no `/sys/bus/usb` → clean `UNAVAILABLE` with an accurate note, no crash). USB is
 the only category implemented this phase; monitors / battery / input devices are
 left as straightforward follow-ups using the same dispatch shape.
+*Superseded in part by ADR-012:* the "one `peripherals` section, add a key per
+category" idea floated here was reversed — each category is now its own section.
+
+## ADR-012 — Peripherals are separate sibling collectors, not one grouped section
+
+**Context.** F3's first cut shipped USB inside a single `peripherals` section
+and noted that later categories (monitors, battery, input, audio) would "add a
+key" to it. Implementing the full set forced the question: one grouped section
+with nested category keys, or one collector/section per category?
+**Decision.** **One collector per category, each its own top-level `Section`** —
+`usb`, `monitors`, `battery`, `input`, `audio` — siblings of `cpu` / `gpu` /
+`baseboard`. The just-shipped `peripherals` section is **renamed to `usb`** (its
+data key `usb` → `devices`) for consistency; `peripherals` was a ROADMAP *bucket*
+name, never a hardware topic. This reverses the "add a key" note in ADR-011.
+Rationale, straight from the project's own ADRs:
+- **Honest per-category status (ADR-004).** `Status` is per-`Section` and means
+  something different per category: a laptop reports `battery=ok` while
+  `usb=ok`; a desktop reports `battery=unavailable` (no battery) while
+  `monitors=ok`. One grouped section would have to collapse those into a single
+  status and re-encode the real state inside `data`.
+- **Isolation for free (ADR-003).** The registry already runs each collector in
+  its own `try/except` — five separate collectors means one probe hanging or
+  raising can't sink the other four. A grouped collector would have to
+  re-implement that per-category guard by hand.
+- **One module per topic (ADR-002).** Adding a topic is already "one new module,
+  zero changes elsewhere"; monitors/battery/audio *are* distinct topics with
+  distinct sources, so they fit the established growth pattern exactly.
+**Consequences.** The report grows by four sibling sections instead of nesting,
+which the generic renderers (ADR-002/007) handle with zero changes. The JSON
+schema's section names are now stable single-topic keys (good for the F4 diff,
+which keys on them). Cost: the `peripherals` → `usb` rename churns the section
+name shipped earlier the same day — accepted, since the schema is easier to get
+right now than after F4 consumes it. Net for F3: `usb` (ADR-011) + `monitors`
+(EDID), `battery`, `input`, `audio`; Bluetooth and printers remain queued as
+further siblings.

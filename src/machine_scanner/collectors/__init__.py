@@ -14,5 +14,9 @@ from . import (  # noqa: F401  (imported for the side effect of registering)
     gpu,
     baseboard,
     memory_modules,
-    peripherals,
+    usb,
+    monitors,
+    audio,
+    input_devices,
+    battery,
 )

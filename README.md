@@ -81,7 +81,11 @@ are explainable rather than silent.
 | `gpu`         | ✅ | all vendors — Windows CIM / Linux `lspci`+sysfs / macOS; NVIDIA enriched via `nvidia-smi` |
 | `baseboard`   | ✅ | motherboard / BIOS / serials from SMBIOS — Windows CIM, Linux DMI, macOS `system_profiler` |
 | `memory_modules` | ✅ | physical DIMMs (slot / size / speed / type / part #) — Windows CIM, Linux `dmidecode`, macOS |
-| `peripherals` | ✅ | USB devices (name + VID:PID) — Windows CIM, Linux `lsusb`/sysfs, macOS `system_profiler`; monitors / input planned |
+| `usb`         | ✅ | USB devices (name + VID:PID) — Windows CIM, Linux `lsusb`/sysfs, macOS `system_profiler` |
+| `monitors`    | ✅ | displays via EDID (manufacturer / product / serial / name) — Windows `WmiMonitorID`, Linux `/sys/class/drm` EDID, macOS |
+| `battery`     | ✅ | charge / status / health — Windows `Win32_Battery`, Linux `power_supply`, macOS `SPPower`; clean "absent" on desktops |
+| `input`       | ✅ | keyboards & pointing devices — Windows CIM, Linux `/proc/bus/input` |
+| `audio`       | ✅ | sound devices — Windows `Win32_SoundDevice`, Linux `/proc/asound`, macOS `SPAudio` |
 
 Output formats: **text** (default), **JSON** (`--json`), **HTML** (`--html`).
 The JSON doubles as an archivable audit artifact.
@@ -104,8 +108,8 @@ The tool degrades gracefully if `psutil` is absent.
 
 - **F2** ✅ — deeper per-OS hardware: `baseboard` (motherboard / BIOS / serials),
   multi-vendor `gpu`, and `memory_modules` (per-DIMM) shipped.
-- **F3** ✅ — peripherals: USB devices shipped (per-OS, VID:PID); monitors / input optional follow-ups.
-- **F4** — richer interactive HTML report.
+- **F3** ✅ — peripherals: `usb`, `monitors` (EDID), `battery`, `input`, `audio` shipped as sibling collectors; Bluetooth / printers queued.
+- **F4** — richer interactive HTML report + scan diff.
 - **F5** — packaged single-file binaries per OS (PyInstaller) for the USB-stick workflow.
 
 Full plan in [`PLAN.md`](PLAN.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md).

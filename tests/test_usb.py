@@ -1,4 +1,4 @@
-"""Tests for the peripherals collector (USB devices — ROADMAP F3).
+"""Tests for the USB devices collector (ROADMAP F3).
 
 Offline and hardware-agnostic: each OS path is driven through a stubbed
 ``run_command`` / ``_smbios.run_cim`` or a temp ``/sys/bus/usb`` directory.
@@ -8,7 +8,7 @@ and never-raises.
 
 import pytest
 
-from machine_scanner.collectors import peripherals as p
+from machine_scanner.collectors import usb
 from machine_scanner.core.models import Status
 
 
@@ -23,7 +23,7 @@ from machine_scanner.core.models import Status
     ],
 )
 def test_vid_pid(device_id, expected):
-    assert p._vid_pid(device_id) == expected
+    assert usb._vid_pid(device_id) == expected
 
 
 @pytest.mark.parametrize(
@@ -31,7 +31,7 @@ def test_vid_pid(device_id, expected):
     [("0x8087", "8087"), ("0x046d  (Logitech)", "046d"), ("8087", "8087"), ("", None), ("none", None)],
 )
 def test_hex_id(value, expected):
-    assert p._hex_id(value) == expected
+    assert usb._hex_id(value) == expected
 
 
 # --------------------------------------------------------------------------- #
@@ -51,23 +51,24 @@ def test_windows_parses_usb(monkeypatch):
             "PNPDeviceID": "USB\\ROOT_HUB30\\4&internal",  # no VID/PID
         },
     ]
-    monkeypatch.setattr(p._smbios, "run_cim", lambda *a, **k: rows)
+    monkeypatch.setattr(usb._smbios, "run_cim", lambda *a, **k: rows)
 
-    sec = p._collect_windows()
+    sec = usb._collect_windows()
 
+    assert sec.name == "usb"
     assert sec.status is Status.OK
     assert sec.data["count"] == 2
-    d0 = sec.data["usb"][0]
+    d0 = sec.data["devices"][0]
     assert d0["vendor_id"] == "8087"
     assert d0["product_id"] == "0024"
-    d1 = sec.data["usb"][1]
+    d1 = sec.data["devices"][1]
     assert "vendor_id" not in d1  # root hub has no VID/PID
     assert "manufacturer" not in d1  # placeholder scrubbed
 
 
 def test_windows_command_failure_is_unavailable(monkeypatch):
-    monkeypatch.setattr(p._smbios, "run_cim", lambda *a, **k: None)
-    sec = p._collect_windows()
+    monkeypatch.setattr(usb._smbios, "run_cim", lambda *a, **k: None)
+    sec = usb._collect_windows()
     assert sec.status is Status.UNAVAILABLE
     assert sec.status is not Status.ERROR
 
@@ -83,16 +84,16 @@ Bus 001 Device 002: ID 046d:c52b Logitech, Inc. Unifying Receiver
 
 
 def test_linux_lsusb_parse():
-    devices = p._parse_lsusb(_LSUSB)
+    devices = usb._parse_lsusb(_LSUSB)
     assert len(devices) == 3
     assert devices[1] == {"name": "Intel Corp. Integrated Rate Matching Hub",
                           "vendor_id": "8087", "product_id": "0024"}
 
 
 def test_linux_prefers_lsusb(monkeypatch):
-    monkeypatch.setattr(p, "current_os", lambda: "linux")
-    monkeypatch.setattr(p, "run_command", lambda *a, **k: _LSUSB)
-    sec = p.collect()
+    monkeypatch.setattr(usb, "current_os", lambda: "linux")
+    monkeypatch.setattr(usb, "run_command", lambda *a, **k: _LSUSB)
+    sec = usb.collect()
     assert sec.status is Status.OK
     assert sec.data["count"] == 3
 
@@ -108,7 +109,7 @@ def test_linux_sysfs_fallback(tmp_path):
     hub = tmp_path / "usb1"  # root hub: no idVendor/idProduct -> dropped
     hub.mkdir()
 
-    devices = p._parse_sysfs_usb(str(tmp_path))
+    devices = usb._parse_sysfs_usb(str(tmp_path))
     assert devices == [{
         "name": "USB Receiver", "manufacturer": "Logitech",
         "vendor_id": "046d", "product_id": "c52b",
@@ -123,17 +124,17 @@ def test_linux_sysfs_skips_interface_nodes(monkeypatch, tmp_path):
     dev.mkdir()
     (dev / "idVendor").write_text("8087\n")
     (dev / "idProduct").write_text("0024\n")
-    monkeypatch.setattr(p.os, "listdir", lambda _root: ["2-1", "2-1:1.0"])
+    monkeypatch.setattr(usb.os, "listdir", lambda _root: ["2-1", "2-1:1.0"])
 
-    devices = p._parse_sysfs_usb(str(tmp_path))
+    devices = usb._parse_sysfs_usb(str(tmp_path))
     assert [d["vendor_id"] for d in devices] == ["8087"]
 
 
 def test_linux_unavailable_when_nothing(monkeypatch):
-    monkeypatch.setattr(p, "current_os", lambda: "linux")
-    monkeypatch.setattr(p, "run_command", lambda *a, **k: None)
-    monkeypatch.setattr(p, "_parse_sysfs_usb", lambda *a, **k: [])
-    sec = p.collect()
+    monkeypatch.setattr(usb, "current_os", lambda: "linux")
+    monkeypatch.setattr(usb, "run_command", lambda *a, **k: None)
+    monkeypatch.setattr(usb, "_parse_sysfs_usb", lambda *a, **k: [])
+    sec = usb.collect()
     assert sec.status is Status.UNAVAILABLE
     assert sec.status is not Status.ERROR
 
@@ -162,14 +163,14 @@ _MAC_USB = """USB:
 
 
 def test_macos_parse(monkeypatch):
-    monkeypatch.setattr(p, "current_os", lambda: "macos")
-    monkeypatch.setattr(p, "run_command", lambda *a, **k: _MAC_USB)
+    monkeypatch.setattr(usb, "current_os", lambda: "macos")
+    monkeypatch.setattr(usb, "run_command", lambda *a, **k: _MAC_USB)
 
-    sec = p.collect()
+    sec = usb.collect()
 
     assert sec.status is Status.OK
     assert sec.data["count"] == 2
-    d0 = sec.data["usb"][0]
+    d0 = sec.data["devices"][0]
     assert d0["name"] == "Unifying Receiver"
     assert d0["vendor_id"] == "046d"
     assert d0["product_id"] == "c52b"
@@ -181,14 +182,14 @@ def test_macos_parse(monkeypatch):
 # --------------------------------------------------------------------------- #
 
 def test_unsupported_os(monkeypatch):
-    monkeypatch.setattr(p, "current_os", lambda: "other")
-    sec = p.collect()
+    monkeypatch.setattr(usb, "current_os", lambda: "other")
+    sec = usb.collect()
     assert sec.status is Status.UNSUPPORTED
 
 
 def test_collect_never_raises_on_real_host():
-    sec = p.collect()
-    assert sec.name == "peripherals"
+    sec = usb.collect()
+    assert sec.name == "usb"
     assert sec.status is not Status.ERROR
 
 

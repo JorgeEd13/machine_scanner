@@ -1,10 +1,10 @@
-"""Peripherals collector — USB devices (ROADMAP F3, first category).
+"""USB devices collector — the USB peripherals attached to this machine.
 
-The first peripheral category: the USB devices attached to this machine. Like
-the F2 deep collectors, the source is chosen per-OS and the result is normalized
-to a single shape — a flat list of ``{name, vendor_id, product_id,
-manufacturer}`` records, with the **VID:PID pair** as the stable cross-OS
-identity (see ADR-011).
+The first of the per-category peripheral collectors (see ADR-012 — peripherals
+are *separate* sibling sections, not one grouped blob). The source is chosen
+per-OS and the result normalized to a flat list of ``{name, vendor_id,
+product_id, manufacturer}`` records, with the **VID:PID pair** as the stable
+cross-OS identity (see ADR-011).
 
 - **Windows** — ``Win32_PnPEntity`` via CIM, filtered to ``PNPDeviceID`` rows
   under the ``USB`` enumerator; VID/PID parsed out of that device ID.
@@ -30,7 +30,7 @@ from ..core.platform import current_os, run_command
 from ..core.registry import register
 from . import _smbios
 
-_TITLE = "Peripherals"
+_TITLE = "USB Devices"
 
 # USB\VID_8087&PID_0024\... — VID/PID live in the first segment of a USB device
 # ID on both Windows (PNPDeviceID) and sysfs modaliases. Hubs / root hubs have
@@ -51,11 +51,9 @@ def _entry(**fields) -> Dict:
 def _finalize(devices: List[Dict], notes: List[str]) -> Section:
     populated = [d for d in devices if d]
     if not populated:
-        return Section(
-            "peripherals", _TITLE, Status.UNAVAILABLE, {"usb": []}, notes
-        )
-    data = {"usb": populated, "count": len(populated)}
-    return Section("peripherals", _TITLE, Status.OK, data, notes)
+        return Section("usb", _TITLE, Status.UNAVAILABLE, {"devices": []}, notes)
+    data = {"devices": populated, "count": len(populated)}
+    return Section("usb", _TITLE, Status.OK, data, notes)
 
 
 # --------------------------------------------------------------------------- #
@@ -83,7 +81,7 @@ def _collect_windows() -> Section:
     rows = _smbios.run_cim(_PS_USB)
     if rows is None:
         return Section(
-            "peripherals", _TITLE, Status.UNAVAILABLE, {"usb": []},
+            "usb", _TITLE, Status.UNAVAILABLE, {"devices": []},
             ["could not enumerate USB devices via CIM (Win32_PnPEntity)"],
         )
     devices: List[Dict] = []
@@ -165,7 +163,7 @@ def _collect_linux() -> Section:
     if devices:
         return _finalize(devices, ["lsusb unavailable; read /sys/bus/usb (no device names)"])
     return Section(
-        "peripherals", _TITLE, Status.UNAVAILABLE, {"usb": []},
+        "usb", _TITLE, Status.UNAVAILABLE, {"devices": []},
         ["no USB devices found (no lsusb and no /sys/bus/usb — common in VMs/WSL2)"],
     )
 
@@ -220,7 +218,7 @@ def _collect_macos() -> Section:
     out = run_command(["system_profiler", "SPUSBDataType"], timeout=20.0)
     if not out or not out.strip():
         return Section(
-            "peripherals", _TITLE, Status.UNAVAILABLE, {"usb": []},
+            "usb", _TITLE, Status.UNAVAILABLE, {"devices": []},
             ["could not enumerate USB via system_profiler"],
         )
     return _finalize(_parse_macos(out), [])
@@ -230,7 +228,7 @@ def _collect_macos() -> Section:
 # Dispatch
 # --------------------------------------------------------------------------- #
 
-@register("peripherals")
+@register("usb")
 def collect() -> Section:
     system = current_os()
     if system == "windows":
@@ -240,6 +238,6 @@ def collect() -> Section:
     if system == "macos":
         return _collect_macos()
     return Section(
-        "peripherals", _TITLE, Status.UNSUPPORTED, {"usb": []},
+        "usb", _TITLE, Status.UNSUPPORTED, {"devices": []},
         [f"USB enumeration is not implemented for {system!r} yet"],
     )
