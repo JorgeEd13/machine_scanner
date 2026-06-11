@@ -4,17 +4,22 @@
 
 ```
 collectors/                 core/                         report/
- system.py  ┐                                              json_report.py
- cpu.py     │  @register     registry.run_all(only)        text_report.py
- memory.py  ├─────────────►  ├ import collectors pkg ─►     html_report.py
- disk.py    │  (self-        │  (triggers @register)             ▲
- network.py │   register)    ├ build meta (os/host/…)            │ walks
- gpu.py     │                └ run each collector  ──► Inventory ┘ sections
- peripherals┘                   in try/except          (meta, [Section…])  generically
-                                                                  │
+ system.py   ┐                                             json_report.py
+ cpu.py      │  @register    registry.run_all(only)        text_report.py
+ memory.py   ├────────────►  ├ import collectors pkg ─►     html_report.py
+ disk.py     │  (self-       │  (triggers @register)        diff.py
+ network.py  │   register)   ├ build meta (os/host/…)            ▲
+ gpu.py …    │               └ run each collector  ──► Inventory ┘ walks sections
+ usb/audio/… ┘                  in try/except          (meta, [Section…])  generically
+ (16 collectors)                                                  │
                                                                   ▼
-                                                         cli.py  (-/--json/--html)
+                                              cli.py  (text/--json/--html/--diff)
 ```
+
+`report/diff.py` is the F4 addition: a **pure** comparison of two saved
+`Inventory.to_dict()` scans (`diff_scans`) plus separate text/HTML formatters
+that display the diff and never recompute it — the same "compute vs render"
+split that keeps the renderers free of collector knowledge.
 
 ## Three ideas, and why
 
@@ -50,9 +55,9 @@ dependency instead of three platform code paths. What psutil can't reach (GPU
 vendors, BIOS/board serials, peripherals) is gathered by **shelling out to OS
 tools** through one guarded helper, `core.platform.run_command`, which swallows
 the three failure modes (missing binary, timeout, non-zero exit) and returns
-`None`. `gpu.py` (NVIDIA via `nvidia-smi`) is the reference implementation of
-that pattern; F2/F3 collectors will follow it for WMI / `lshw` /
-`system_profiler`.
+`None`. `gpu.py` (NVIDIA via `nvidia-smi`) was the reference implementation of
+that pattern; the F2/F3 collectors follow it for PowerShell CIM / `lspci` /
+`lsblk` / `bluetoothctl` / `system_profiler`.
 
 psutil itself is imported lazily via `collectors/_psutil.py`: if it's absent,
 the dependent collectors degrade to `PARTIAL`/`UNAVAILABLE` with a clear note
@@ -62,7 +67,9 @@ rather than crashing.
 
 - `core/` — no knowledge of specific collectors or output formats.
 - `collectors/` — depend on `core`; never on `report` or `cli`.
-- `report/` — depend on `core.models` only; never import collectors.
+- `report/` — depend on `core.models` only; never import collectors. The diff
+  (`report/diff.py`) computes over plain `to_dict()` dicts and is renderer-
+  agnostic; its text/HTML formatters display but never compute.
 - `cli.py` — wires registry → renderer; the only place that knows all three.
 
 Dependencies point inward toward `core`; nothing in `core` imports outward.
@@ -71,9 +78,10 @@ Dependencies point inward toward `core`; nothing in `core` imports outward.
 
 `ok` (got it all) · `partial` (some fields) · `unavailable` (nothing to collect
 here, e.g. no GPU) · `unsupported` (not implemented for this OS yet) · `error`
-(the collector raised). The distinction matters: a machine with no NVIDIA GPU is
-`unavailable`, not a failure — and `peripherals` is `unsupported`, which makes
-the roadmap visible in the output itself.
+(the collector raised). The distinction matters: a desktop with no battery
+reports `battery=unavailable`, not a failure; a collector with no
+implementation for the current OS reports `unsupported` — so an expected gap is
+never mistaken for a bug.
 
 ## Portability note (the design constraint)
 

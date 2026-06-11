@@ -46,23 +46,26 @@ src-layout package; core (`models`, `platform`, `registry`); collectors for
 (10 passing); README, CLAUDE, docs skeletons, MIT license, pyproject. Verified
 end-to-end on Windows.
 
-### Phase 1 — Hardening & ergonomics
+### Phase 1 — Hardening & ergonomics  ✅
 Richer text layout (nested tables for interfaces/partitions), `--only` groups,
 exit codes, more edge-case tests (no-psutil path, error isolation), CI
 (GitHub Actions: pytest on Linux + Windows). Cross-OS smoke run (Linux/WSL).
 
-### Phase 2 — Deeper hardware (per-OS)
+### Phase 2 — Deeper hardware (per-OS)  ✅
 GPU beyond NVIDIA (AMD/Intel/integrated); motherboard / BIOS / RAM-slot /
 serials via WMI (Windows), `dmidecode`/`lshw` (Linux), `system_profiler`
 (macOS). Honest privilege handling (note when elevation would add fields).
+**F2.x:** `storage_devices` — physical drives (bus / media / SMART) beyond the
+psutil partition view.
 
-### Phase 3 — Peripherals & extras
-USB devices, monitors, input devices, battery/sensors. Each is a collector
-following the F2 per-OS command pattern.
+### Phase 3 — Peripherals & extras  ✅
+USB devices, monitors, input devices, battery, audio — plus bluetooth and
+printers. Each is a sibling collector following the F2 per-OS command pattern.
 
-### Phase 4 — Richer HTML report
-Interactive single-file report (collapsible sections, search, copy-as-JSON);
-optional diff between two scans ("what changed on this box").
+### Phase 4 — Richer HTML report + scan diff  ✅
+Interactive single-file report (collapsible sections, search, copy-as-JSON) and
+a diff between two saved scans ("what changed on this box"). Self-contained
+HTML, inline vanilla JS, no external assets.
 
 ### Phase 5 — Packaged binaries (the USB-stick deliverable)
 PyInstaller one-file builds per OS (`build/` specs), a tiny launcher, and a
