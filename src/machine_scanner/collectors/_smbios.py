@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 from typing import Dict, List, Optional
 
-from ..core.platform import run_command
+from ..core.platform import POWERSHELL_UTF8, run_command
 
 # Common SMBIOS placeholder strings (lower-cased) that mean "not really set".
 _PLACEHOLDERS = {
@@ -61,6 +61,16 @@ def clean(value: object) -> Optional[str]:
     return text or None
 
 
+def _strip_bom(text: str) -> str:
+    """Drop a leading UTF-8 BOM if present (json.loads rejects one).
+
+    Done via a utf-8-sig round-trip so the source stays ASCII (no invisible
+    BOM character embedded here). A no-BOM encoding is already forced on the
+    PowerShell side, so this is belt-and-suspenders.
+    """
+    return text.encode("utf-8").decode("utf-8-sig")
+
+
 def run_cim(ps_script: str, timeout: float = 20.0) -> Optional[List[Dict]]:
     """Run a PowerShell CIM script that emits JSON; return a list of records.
 
@@ -68,15 +78,25 @@ def run_cim(ps_script: str, timeout: float = 20.0) -> Optional[List[Dict]]:
     a (possibly empty) ``list[dict]`` otherwise — a single CIM row that
     PowerShell serialized as a bare object is wrapped into a one-element list so
     callers never have to special-case it.
+
+    The script is prefixed with :data:`POWERSHELL_UTF8` so accented values
+    (e.g. a pt-BR device name like ``Aperfeiçoado``) come back intact rather
+    than mojibake from the console OEM code page.
     """
     raw = run_command(
-        ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script],
+        [
+            "powershell",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            POWERSHELL_UTF8 + ps_script,
+        ],
         timeout=timeout,
     )
     if not raw or not raw.strip():
         return None
     try:
-        obj = json.loads(raw)
+        obj = json.loads(_strip_bom(raw))
     except (ValueError, TypeError):
         return None
     if obj is None:

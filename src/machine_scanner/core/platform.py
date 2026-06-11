@@ -17,6 +17,13 @@ import platform
 import subprocess
 from typing import List, Optional
 
+# Windows PowerShell 5.1 writes stdout in the console **OEM** code page (e.g.
+# cp850 on a pt-BR box), not UTF-8. Prefixing a PowerShell command with this
+# forces UTF-8 output so `run_command` (which decodes as UTF-8) reads accented
+# device names correctly instead of mojibake. A no-BOM UTF8Encoding is used so
+# the emitted JSON has no leading BOM to trip `json.loads`.
+POWERSHELL_UTF8 = "[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false; "
+
 
 def current_os() -> str:
     """Return a normalized OS name: windows | linux | macos | other."""
@@ -52,8 +59,15 @@ def run_command(args: List[str], timeout: float = 5.0) -> Optional[str]:
 
     Guards the three failure modes that would otherwise break a scan: the
     binary is missing (``FileNotFoundError``), it hangs (``timeout``), or it
-    exits non-zero. Output is decoded leniently because tools like ``wmic`` and
-    ``system_profiler`` emit locale-dependent bytes.
+    exits non-zero.
+
+    Output is decoded as **UTF-8** with ``errors="replace"`` rather than the
+    locale default. The locale code page (cp1252 on a pt-BR Windows) silently
+    *mis-decodes* the OEM-code-page bytes PowerShell emits — turning ``ç`` into
+    ``‡`` and ``ã`` into ``Æ`` — so the corruption lands in the captured data,
+    not just the console. Linux/macOS tools already emit UTF-8, and PowerShell
+    is forced to UTF-8 via :data:`POWERSHELL_UTF8`, so UTF-8 is correct for
+    every source we shell out to.
     """
     try:
         out = subprocess.run(
@@ -62,6 +76,7 @@ def run_command(args: List[str], timeout: float = 5.0) -> Optional[str]:
             timeout=timeout,
             check=True,
             text=True,
+            encoding="utf-8",
             errors="replace",
         )
         return out.stdout

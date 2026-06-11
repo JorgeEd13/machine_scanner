@@ -26,7 +26,7 @@ import os
 from typing import Dict, Optional
 
 from ..core.models import Section, Status
-from ..core.platform import current_os, is_admin, run_command
+from ..core.platform import POWERSHELL_UTF8, current_os, is_admin, run_command
 from ..core.registry import register
 
 _TITLE = "Motherboard / BIOS"
@@ -158,7 +158,7 @@ def _collect_windows() -> Section:
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            _PS_SCRIPT,
+            POWERSHELL_UTF8 + _PS_SCRIPT,
         ],
         timeout=20.0,
     )

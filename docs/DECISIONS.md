@@ -390,3 +390,39 @@ offline. Within a section it keys changes on a **deterministic index-based path*
 (`data.devices[2].vid`): a reordered list shows as field changes rather than a
 move — an accepted, honest trade-off for an inventory diff, where determinism of
 the path matters more than order-invariance.
+
+## ADR-016 — Force UTF-8 end-to-end for subprocess output (the OEM-vs-ANSI mojibake bug)
+
+**Context.** On a pt-BR Windows box the captured data — not just the console —
+came back corrupted: a keyboard named `Aperfeiçoado` arrived as `Aperfei‡oado`
+and `padrão` as `padrÆo`, and that mojibake was written straight into the JSON
+artifact. Root cause: **two different Windows code pages**. Windows PowerShell
+5.1 writes its stdout in the console **OEM** code page (cp850 on pt-BR), but
+`run_command` used `subprocess` with `text=True` and no explicit encoding, so
+Python decoded with the **locale ANSI** code page (cp1252). cp850 and cp1252
+disagree on the high bytes, so the decode *silently succeeded with the wrong
+characters* (`ç` = cp850 `0x87` → cp1252 `‡`; `ã` = cp850 `0xC6` → cp1252 `Æ`) —
+`errors="replace"` never fired because nothing was undecodable, just mis-mapped.
+An earlier STATE note mis-diagnosed this as a *text-renderer* console-codepage
+cosmetic issue and claimed "the JSON is correct"; it was not.
+**Decision.** **Make UTF-8 the single encoding on both ends.**
+- `core.platform.run_command` decodes subprocess output as **`encoding="utf-8",
+  errors="replace"`** instead of the locale default. Linux/macOS tools already
+  emit UTF-8, so this is correct there; the only Windows non-PowerShell caller is
+  `nvidia-smi` (ASCII), so it is safe too.
+- Every PowerShell invocation is prefixed with **`POWERSHELL_UTF8`** =
+  `"[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false; "`,
+  forcing PowerShell to *emit* UTF-8 to match. A **no-BOM** `UTF8Encoding` is
+  used so the JSON has no leading BOM; `run_cim` still strips a BOM defensively
+  (`_strip_bom`, via a `utf-8-sig` round-trip — no invisible BOM character in the
+  source). Both `_smbios.run_cim` (10 collectors) and `baseboard`'s direct
+  PowerShell call get the prefix.
+**Consequences.** Accented device / manufacturer names are now captured
+correctly across locales, so the JSON archive and every renderer are right — not
+just the console. The fix is centralized (one constant + one decode change),
+adds no dependency, and is locked by offline tests (`test_platform_encoding.py`:
+`run_command` passes `encoding="utf-8"`; `run_cim` prepends the prefix and
+strips a BOM; the accented round-trip survives). Verified live on Windows
+(`input` → `Aperfeiçoado`, `padrão`; no `‡`/`Æ` bytes in the JSON). The general
+rule this sets: **never rely on the platform default code page for subprocess
+text — pin UTF-8 and make the child emit it too.**

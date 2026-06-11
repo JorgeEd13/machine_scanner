@@ -37,7 +37,8 @@ Two deliverables, both shipped:
    `--json` change the form; `-o` writes a file).
 
 **224 tests green** (was 204; +20: `test_html_report.py`, `test_diff.py`, +3
-CLI diff tests). No new dependency (pure stdlib); never raises.
+CLI diff tests). No new dependency (pure stdlib); never raises. **227** after the
+post-F4 encoding fix (ADR-016, `test_platform_encoding.py`).
 
 ### Verified
 - **Windows live**: `--html` on a real 16-section scan → **0 external
@@ -165,6 +166,10 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
   ignored — delete them before committing (done this session).
 - WSL has no `pip`, so pytest wasn't run there; CI's ubuntu job covers
   pytest-on-Linux. The WSL CLI run confirms cross-OS execution + self-containment.
-- Known cosmetic: non-ASCII device names (PT-BR locale) show console-codepage
-  mojibake in the *text* renderer on Windows; JSON/HTML are correct. Pre-existing,
-  not a blocker.
+- **Fixed 2026-06-11 (ADR-016):** non-ASCII device names (pt-BR) were corrupted
+  in the *captured data* (`Aperfeiçoado`→`Aperfei‡oado`), not just the console —
+  PowerShell emits OEM cp850, Python was decoding locale cp1252. Fix: force UTF-8
+  on both ends (`run_command` decodes UTF-8; every PowerShell call prefixed with
+  `POWERSHELL_UTF8`). The earlier "JSON is correct" note was wrong. Verified live
+  (`input` → `Aperfeiçoado`, `padrão`; no `‡`/`Æ` in the JSON). +3 tests
+  (`test_platform_encoding.py`).
