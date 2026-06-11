@@ -1,0 +1,4 @@
+# Runtime dependency. The tool degrades gracefully if psutil is missing
+# (the system/cpu/network collectors still return partial data), but psutil
+# is the cross-platform backbone for full CPU/memory/disk/network detail.
+psutil>=5.9

@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/dist/
+dist/
+.venv/
+venv/
+env/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# PyInstaller build artifacts (the per-OS binaries are built, not committed)
+*.spec.bak
+build/*/
+*.manifest
+
+# Generated reports (don't commit a scan of a real machine)
+*.report.html
+scan-*.json
+scan-*.html
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

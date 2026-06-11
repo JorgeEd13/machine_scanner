@@ -1,0 +1,69 @@
+# DECISIONS — machine_scanner (ADRs)
+
+Architecture Decision Records. Short, append-only. Each: context → decision →
+consequences.
+
+## ADR-001 — psutil as the cross-platform backbone
+
+**Context.** CPU / memory / disk / network detection differs per OS. The choices
+were: (a) write per-OS subprocess parsing for each, or (b) lean on a portable
+library.
+**Decision.** Use **psutil** for everything it covers; reserve OS-specific
+commands only for what psutil can't reach (GPU vendors, BIOS/board serials,
+peripherals).
+**Consequences.** One dependency instead of three brittle code paths; far less
+parsing of locale-dependent command output. psutil is imported lazily
+(`collectors/_psutil.py`) so its absence degrades gracefully instead of
+crashing. This is also a deliberate **clean-room reimplementation** — the
+private hardware helper that inspired the project used hand-rolled `wmic`/
+`/proc` parsing; we did not copy it.
+
+## ADR-002 — Self-registering collectors + uniform Section
+
+**Context.** Hardware coverage will grow; we don't want each new probe to ripple
+through the CLI and every renderer.
+**Decision.** Every collector returns a uniform `Section`; collectors
+self-register via `@register`; renderers walk sections generically.
+**Consequences.** Adding a collector is one new module — zero changes in `core`,
+`report`, or `cli`. The cost is an import-for-side-effect in
+`collectors/__init__.py`, which is explicit and listed.
+
+## ADR-003 — Isolate each collector; never abort the scan
+
+**Context.** A single flaky probe (e.g. `nvidia-smi` hanging, a permission
+error) could otherwise sink the entire inventory.
+**Decision.** Run each collector inside `try/except`; on failure emit an `ERROR`
+section with the traceback and continue.
+**Consequences.** Partial results are always available — the most useful
+behavior for a diagnostic tool run on an unknown machine. Bugs are visible (as
+`error` sections) rather than silent.
+
+## ADR-004 — Explicit status enum over booleans / missing keys
+
+**Context.** "No GPU", "not implemented on this OS", "psutil missing", and "it
+crashed" are different things and a reader needs to tell them apart.
+**Decision.** A `Status` enum: `ok / partial / unavailable / unsupported /
+error`, inheriting `str` for clean JSON.
+**Consequences.** Honest output (a GPU-less box is `unavailable`, not a
+failure); the roadmap is visible in the data (`peripherals` = `unsupported`).
+
+## ADR-005 — src-layout package + console script
+
+**Context.** Public repo that should be `pip install`-able and also runnable
+straight from a checkout.
+**Decision.** `src/` layout, `pyproject.toml` with a `machine-scanner` console
+script and `pytest` `pythonpath = ["src"]`.
+**Consequences.** Tests run against the installed import path (no accidental
+"works only from repo root"); `python -m machine_scanner` and the installed
+command both work. Slightly more setup than a flat layout — worth it for a
+showcase.
+
+## ADR-006 — Local single-host inventory only (scope guard)
+
+**Context.** "Scan the network" could mean inventorying *this* machine's
+interfaces, or actively probing *other* hosts.
+**Decision.** Inventory **this machine only**. No port scanning of other hosts,
+no remote/fleet mode.
+**Consequences.** The tool stays unambiguously a benign diagnostic utility,
+which matters for a public portfolio piece. Fleet aggregation, if ever wanted,
+would be a separate project consuming the JSON output.
