@@ -337,3 +337,56 @@ covered by offline tests (canned CIM rows, a tmp `hciX` tree, canned
 `bluetoothctl`/`system_profiler` text). *Printers*, shipped in the same phase,
 needed **no** ADR — `Win32_Printer` / `lpstat -p`+`-d` (CUPS) / `SPPrintersDataType`
 is the straightforward ADR-011 dispatch shape with no non-obvious choice.
+
+## ADR-015 — Interactive HTML = inline vanilla JS, no framework, no external assets
+
+**Context.** F4 turns the static HTML report into a genuinely shareable,
+*interactive* artifact: collapsible sections, a search/filter box, and
+copy-as-JSON (per section and whole-scan). Interactivity forces a real choice
+that the static renderer never faced — **how** to add behaviour to a file that
+must stay a single, portable, drop-on-a-USB-stick document. The options were:
+(a) a JS framework / bundler (React, Alpine, …), (b) a CDN-hosted library, or
+(c) hand-written vanilla JS inlined into the page.
+**Decision.** **Option (c): inline vanilla JS + inline CSS, zero external
+assets.** No framework, no bundler, no CDN, no external `src`/`href`. The whole
+report remains one self-contained `.html` file. Concretely:
+- **Collapse is native `<details>`/`<summary>`**, not JS-driven. This is the
+  load-bearing choice: with JavaScript disabled the document still *fully works*
+  as a readable static report — every section is laid out as a tree and
+  collapses natively; only the search box and copy buttons go inert. The
+  interactive layer is **progressive enhancement**, never a hard dependency.
+- **Search** filters `<details>` cards by a precomputed lowercase `data-search`
+  haystack (section name + every key/value + notes); **copy** reads an
+  HTML-escaped JSON payload from a `data-copy-json` attribute and writes it via
+  `navigator.clipboard` with a `<textarea>+execCommand` fallback for non-secure
+  contexts. JSON lives in attributes (decoded losslessly by `getAttribute`)
+  rather than `<script>` tags, sidestepping any `</script>`-in-data escaping
+  hazard.
+- **Nested data is rendered as a recursive HTML tree** (`_render_value` /
+  `_render_mapping`) — the structural twin of the text renderer's ADR-007 — not
+  a raw `<pre>` JSON dump. `<pre>` is kept only as a leaf fallback for a value
+  that is somehow neither mapping, list nor scalar; it is never used to dump a
+  whole structure.
+**Consequences.** The report stays a single portable file with **no new
+dependency** (keeps CI and the F5 binary story clean) and works offline forever
+— no CDN to rot, nothing to fetch. Choosing native `<details>` over a JS
+accordion means the no-JS degradation is honest rather than a blank page. The
+cost is hand-written DOM code instead of a framework's conveniences, which at
+this scope (one search box, a few buttons, ~40 lines of JS) is trivial. The diff
+renderer (`report/diff.py`'s `diff_to_html`) follows the same rule: self-contained,
+inline CSS, no JS needed at all. A focused offline test (`test_html_report.py`)
+asserts self-containment (no remote `http(s)`/`src=`/`href=`), the presence of
+the search/collapse/copy scaffolding, and that nested data renders as a tree
+rather than a `<pre>` blob. Verified live on Windows (a real 16-section scan →
+0 external references, 16 native-collapsible cards, copy + search wired, 0 `<pre>`
+dumps) and via WSL2 (same, plus the diff renderer self-contained), zero ERROR.
+
+*Diffing itself (`diff_scans`)* needed no separate ADR for its mechanics, but
+two of its choices are worth recording here: it is a **pure, renderer-agnostic
+compute** (preserving the ADR-002 separation — the diff computes a structure,
+the text/HTML renderers only display it, neither crosses over) and it consumes
+**two saved JSON scans, never a live re-scan**, so a diff is reproducible and
+offline. Within a section it keys changes on a **deterministic index-based path**
+(`data.devices[2].vid`): a reordered list shows as field changes rather than a
+move — an accepted, honest trade-off for an inventory diff, where determinism of
+the path matters more than order-invariance.

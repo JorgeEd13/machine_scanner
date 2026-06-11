@@ -3,42 +3,52 @@
 > Volatile, short. Update at the end of each step.
 
 **Date:** 2026-06-11
-**Phase:** F3-extras (`bluetooth` + `printers`) — ✅ **closed**. Two more
-peripheral sibling collectors (ADR-014 for the non-obvious Bluetooth choice),
-shipped together like the F3 five. With this the F3 bucket is fully done. Next:
-**F4** (richer HTML + scan diff) — the next numbered phase.
+**Phase:** F4 (richer interactive HTML + scan diff) — ✅ **closed** (both
+deliverables landed in one session). ADR-015 for the interactivity choice.
+Next: **F5** (packaged PyInstaller binaries per OS) — the last numbered phase
+and now the head of the queue.
 
-## Current focus (F3-extras)
+## Current focus (F4) — done
 
-Two new sibling sections on the established ADR-012 pattern (own module + section
-+ test file each, registered in `collectors/__init__.py`):
+Two deliverables, both shipped:
 
-- **`bluetooth`** (ADR-014) — reports the radio and the paired peers as **two
-  separate levels**: data is `{"adapters": [...], "devices": [...]}` (+ counts);
-  a radio with no paired devices is still `ok`, only *neither* → `unavailable`.
-  - **Windows** `Win32_PnPEntity` where `PNPClass='Bluetooth'` (CIM, `@()`-wrapped
-    to tell "no BT" from a query failure); rows split by `PNPDeviceID` —
-    `DEV_<mac>` → paired device, `BTHENUM\{guid}_…` service node dropped, else the
-    adapter.
-  - **Linux** `bluetoothctl devices` (device level — it resolves remote *names*
-    sysfs can't) **complemented** by `/sys/class/bluetooth/hci*` (adapter level);
-    no daemon / no `hciX` → clean `unavailable`.
-  - **macOS** `SPBluetoothDataType` (nested controller + Connected/Not Connected).
-- **`printers`** (no ADR — straightforward ADR-011 shape): **Windows**
-  `Win32_Printer` (name/default/port/driver/shared/network/offline, `@()`-wrapped);
-  **Linux** `lpstat -p` + `-d` (CUPS; no `lpstat`/no cupsd → clean `unavailable`);
-  **macOS** `SPPrintersDataType`.
+1. **Interactive HTML** (`report/html_report.py`, ADR-015). The static
+   one-card-per-section renderer became *interactive* without leaving its single
+   self-contained file:
+   - **Native `<details>` collapse** — JS-off still gives a readable, collapsible
+     static page (progressive enhancement, not a hard dependency).
+   - **Search box** filters cards by a precomputed lowercase `data-search`
+     haystack (section name + every key/value + notes).
+   - **Copy-as-JSON** per section *and* whole-scan, from `data-copy-json`
+     attributes via `navigator.clipboard` (+ `<textarea>`/`execCommand` fallback).
+   - **Nested data as a recursive HTML tree** (`_render_value`/`_render_mapping`,
+     the twin of the text renderer's ADR-007) — `<pre>` only as a leaf fallback,
+     never a whole-structure dump.
+   - **Inline CSS + inline vanilla JS, zero external assets** (no framework, no
+     CDN, no `src`/`href`). Expand-all / collapse-all controls too.
+2. **Scan diff** (`report/diff.py`). A **pure, renderer-agnostic** `diff_scans`
+   over two saved `Inventory.to_dict()` JSON scans (never a live re-scan):
+   `sections_added` / `sections_removed` (each `{name,title,status}`) +
+   `sections_changed` (per-section field-level `{path,kind,old,new}` on a
+   deterministic index-based path, e.g. `data.devices[2].vid`). An identical
+   pair → three empty buckets. Two **pure formatters** beside it — `diff_to_text`
+   and a self-contained `diff_to_html` — that display, never compute (ADR-002
+   boundary held). CLI: **`--diff OLD.json NEW.json`** (text default; `--html` /
+   `--json` change the form; `-o` writes a file).
 
-**204 tests green** (was 185; +19). Never raise; UNAVAILABLE/UNSUPPORTED with
-accurate notes.
+**224 tests green** (was 204; +20: `test_html_report.py`, `test_diff.py`, +3
+CLI diff tests). No new dependency (pure stdlib); never raises.
 
 ### Verified
-- **Windows live**: `bluetooth` → clean **`unavailable`** ("no Bluetooth-class
-  devices", this desktop has no radio — correctly *not* an ERROR); `printers` →
-  **`ok`** with 9 real queues (HP DesignJet network printer flagged `default`,
-  Brother + virtual MS/OneNote/AnyDesk queues), all unprivileged.
-- **WSL2 smoke**: both → clean **`unavailable`** (no `/sys/class/bluetooth` + no
-  `bluetoothctl`; no CUPS/`lpstat`), zero ERROR.
+- **Windows live**: `--html` on a real 16-section scan → **0 external
+  references** (no `http(s)`/`src=`/`href=`), 16 native-collapsible cards, search
+  + copy (17 copy buttons + copy-all) wired, **0 `<pre>` dumps** (nested data is
+  a tree). `--diff` on two saved JSON scans (controlled edit) → correct
+  `section removed: Audio Devices` + `+ data.fake_metric: 123`; `--html`/`--json`
+  diff forms self-contained and exit 0; identical-pair → "no differences".
+- **WSL2 smoke**: `--html` → 0 external refs, 16 cards, 0 `<pre>`; two real
+  re-scans diffed (`--diff`, text + self-contained HTML) → exit 0, zero ERROR;
+  cross-OS parity confirmed.
 
 ## Prior phase (F2.x) — reference
 
@@ -124,21 +134,28 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
 
 ## Next step
 
-- **F4 — richer HTML report + scan diff** (the next numbered phase): collapsible
-  sections, search/filter, copy-as-JSON, and a diff between two saved scans. This
-  is now the head of the queue (F3 and its extras are done).
+- **F5 — packaged binaries (USB-stick deliverable)** — the last numbered phase,
+  now the head of the queue. PyInstaller one-file specs in `build/` per OS + a
+  release workflow producing `machine-scanner-{win,linux,macos}` + a short stick
+  layout doc. DoD: a downloadable binary per OS that runs with no Python
+  installed. (See ROADMAP F5.)
 
 ## Notes / open points
 
-- CI should stay green (no new deps; all new tests are offline). Prior runs green.
-- Live Windows shows real data for all 5 peripheral sections; **battery degrades
-  to an accurate `no battery present`** on this desktop (the `@()`+`-InputObject`
-  trick distinguishes "no rows" from "query failed" — see `_PS_BAT`).
-- WSL2 exposes no `lsusb` / DRM EDID / `BAT*` / `/proc/asound` → all 5 peripheral
-  sections are `[n/a]` there (verified, zero ERROR); parse paths are covered by
-  offline tmp-dir / canned-output / hand-built-EDID tests instead.
+- CI should stay green (F4 added **no new deps**; all 20 new tests are offline).
+  Prior runs green.
+- **F4 self-containment contract** (ADR-015): the HTML report and the diff HTML
+  are single files with inline CSS + inline vanilla JS and **zero** external
+  `http(s)`/`src=`/`href=`. `test_html_report.py` / `test_diff.py` lock this; if
+  F5 or later ever adds an asset, those tests must be revisited deliberately.
+- The diff keys on a **deterministic index-based path** into nested data — a
+  reordered list reads as field changes, not a move. Accepted trade-off for an
+  inventory diff (determinism > order-invariance); noted in ADR-015.
+- `.gitignore` covers `scan-*.json` / `*.report.html` / `scan-*.html`. Ad-hoc
+  verification artifacts named otherwise (e.g. `out.html`, `_wsl_*`) are **not**
+  ignored — delete them before committing (done this session).
 - WSL has no `pip`, so pytest wasn't run there; CI's ubuntu job covers
-  pytest-on-Linux. The WSL CLI run was enough to confirm cross-OS execution.
+  pytest-on-Linux. The WSL CLI run confirms cross-OS execution + self-containment.
 - Known cosmetic: non-ASCII device names (PT-BR locale) show console-codepage
-  mojibake in the *text* renderer on Windows; the JSON is correct. Pre-existing,
-  not specific to peripherals — candidate cleanup, not a blocker.
+  mojibake in the *text* renderer on Windows; JSON/HTML are correct. Pre-existing,
+  not a blocker.

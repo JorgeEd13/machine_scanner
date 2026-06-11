@@ -5,17 +5,20 @@
     machine-scanner --html -o report.html
     machine-scanner --only cpu,memory,network
     machine-scanner --list          # list available collectors
+    machine-scanner --diff old.json new.json        # text diff of two scans
+    machine-scanner --diff old.json new.json --html -o diff.html
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 
 from . import __version__
 from .core.models import Status
 from .core.registry import available, run_all
-from .report import to_html, to_json, to_text
+from .report import diff_scans, diff_to_html, diff_to_text, to_html, to_json, to_text
 
 # Exit codes: 0 = clean, 2 = at least one collector hit a genuine bug (ERROR).
 # Expected gaps (PARTIAL / UNAVAILABLE / UNSUPPORTED) are not failures.
@@ -42,8 +45,49 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--list", action="store_true", help="list available collectors and exit"
     )
+    parser.add_argument(
+        "--diff",
+        nargs=2,
+        metavar=("OLD.json", "NEW.json"),
+        help="diff two saved JSON scans (text by default; --html / --json change the form)",
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser
+
+
+def _emit(rendered: str, out: str | None) -> None:
+    """Write a rendered report to a file or stdout (UTF-8 safe on Windows)."""
+    if out:
+        with open(out, "w", encoding="utf-8") as fh:
+            fh.write(rendered)
+        print(f"wrote {out}", file=sys.stderr)
+    else:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        print(rendered)
+
+
+def _run_diff(paths: list[str], as_html: bool, as_json: bool, out: str | None) -> int:
+    """Load two saved JSON scans, diff them, render and emit. No re-scan."""
+    old_path, new_path = paths
+    try:
+        with open(old_path, encoding="utf-8") as fh:
+            old = json.load(fh)
+        with open(new_path, encoding="utf-8") as fh:
+            new = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"error: could not read scans to diff: {exc}", file=sys.stderr)
+        return EXIT_COLLECTOR_ERROR
+
+    diff = diff_scans(old, new)
+    if as_json:
+        rendered = json.dumps(diff, indent=2, ensure_ascii=False)
+    elif as_html:
+        rendered = diff_to_html(diff)
+    else:
+        rendered = diff_to_text(diff)
+    _emit(rendered, out)
+    return EXIT_OK
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -52,6 +96,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.list:
         print("\n".join(available()))
         return EXIT_OK
+
+    if args.diff:
+        return _run_diff(args.diff, args.html, args.json, args.out)
 
     only = [s.strip() for s in args.only.split(",")] if args.only else None
     inventory = run_all(only=only)
@@ -63,16 +110,9 @@ def main(argv: list[str] | None = None) -> int:
     else:
         rendered = to_text(inventory)
 
-    if args.out:
-        with open(args.out, "w", encoding="utf-8") as fh:
-            fh.write(rendered)
-        print(f"wrote {args.out}", file=sys.stderr)
-    else:
-        # reconfigure stdout to UTF-8 on Windows so the report never crashes on
-        # a non-ASCII device name in a legacy code page.
-        if hasattr(sys.stdout, "reconfigure"):
-            sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
-        print(rendered)
+    # _emit reconfigures stdout to UTF-8 on Windows so the report never crashes
+    # on a non-ASCII device name in a legacy code page.
+    _emit(rendered, args.out)
 
     errored = any(s.status is Status.ERROR for s in inventory.sections)
     return EXIT_COLLECTOR_ERROR if errored else EXIT_OK

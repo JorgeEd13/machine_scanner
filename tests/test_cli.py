@@ -4,6 +4,8 @@ Offline and hardware-agnostic: we drive ``cli.main`` directly and, where the
 result must be deterministic, stub the scan with a controlled Inventory.
 """
 
+import json
+
 import machine_scanner.cli as cli
 from machine_scanner.core.models import Inventory, Section, Status
 
@@ -44,3 +46,36 @@ def test_json_output_is_emitted(monkeypatch, capsys):
     cli.main(["--json"])
     out = capsys.readouterr().out
     assert '"cores_logical": 4' in out
+
+
+def _write_scan(path, cores):
+    inv = Inventory(
+        meta={"hostname": "box", "scanned_at": "t"},
+        sections=[Section("cpu", "CPU", Status.OK, {"cores": cores})],
+    )
+    path.write_text(json.dumps(inv.to_dict()), encoding="utf-8")
+    return str(path)
+
+
+def test_diff_two_saved_scans_text(tmp_path, capsys):
+    old = _write_scan(tmp_path / "old.json", 4)
+    new = _write_scan(tmp_path / "new.json", 8)
+    assert cli.main(["--diff", old, new]) == cli.EXIT_OK
+    out = capsys.readouterr().out
+    assert "data.cores" in out
+    assert "scan diff" in out.lower()
+
+
+def test_diff_html_to_file(tmp_path, capsys):
+    old = _write_scan(tmp_path / "old.json", 4)
+    new = _write_scan(tmp_path / "new.json", 8)
+    out_file = tmp_path / "diff.html"
+    assert cli.main(["--diff", old, new, "--html", "-o", str(out_file)]) == cli.EXIT_OK
+    html = out_file.read_text(encoding="utf-8")
+    assert html.startswith("<!doctype html>")
+    assert "data.cores" in html
+
+
+def test_diff_missing_file_errors(tmp_path):
+    old = _write_scan(tmp_path / "old.json", 4)
+    assert cli.main(["--diff", old, str(tmp_path / "nope.json")]) == cli.EXIT_COLLECTOR_ERROR

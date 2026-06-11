@@ -88,13 +88,29 @@
   WSL2 (4 Hyper-V virtual disks via lsblk → PARTIAL + smartctl/root note, exit 0).
   See ADR-013.
 
-## F4 — Richer HTML report
+## F4 — Richer HTML report + scan diff  ✅ (2026-06-11)
 
 - **Objective:** a genuinely shareable artifact.
-- **How:** collapsible sections, search/filter, copy-as-JSON; optional **diff**
+- **How:** collapsible sections, search/filter, copy-as-JSON; a **diff**
   between two saved scans ("what changed on this machine").
-- **DoD:** single self-contained HTML, no external assets, diff works on two
-  sample scans.
+- **DoD:** ✅ both deliverables landed, single self-contained HTML, no external
+  assets, diff works on two sample scans.
+  - **Interactive HTML** (ADR-015): native `<details>` collapse (degrades to a
+    readable static page with JS off), a search box filtering by section
+    name / key / value, copy-as-JSON per section *and* whole-scan, and nested
+    data rendered as a recursive HTML tree (ADR-007's twin), not a `<pre>` dump.
+    Single self-contained file — inline CSS + inline vanilla JS, zero external
+    `src`/`href`/CDN. Verified live on Windows (16-section scan → 0 external
+    refs, 16 collapsible cards, 0 `<pre>`) and WSL2.
+  - **Scan diff** (`report/diff.py`): a pure, renderer-agnostic `diff_scans`
+    over two saved `Inventory.to_dict()` JSON scans → sections added / removed
+    and per-section field-level changes on a deterministic index-based path
+    (`data.devices[2].vid`). Text + self-contained-HTML + JSON renderers.
+    CLI: `--diff OLD.json NEW.json` (text default; `--html` / `--json` change
+    the form; `-o` to write a file). Loads saved scans, never re-scans.
+  - **20 offline tests** (`test_html_report.py`, `test_diff.py`, +3 CLI diff
+    tests): self-containment, search/collapse/copy scaffolding, nested tree,
+    and diff add/remove/change incl. the no-change (empty) case. 224 total green.
 
 ## F5 — Packaged binaries (USB-stick deliverable)
 
