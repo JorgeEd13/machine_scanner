@@ -3,33 +3,40 @@
 > Volatile, short. Update at the end of each step.
 
 **Date:** 2026-06-11
-**Phase:** F2 (deeper per-OS hardware) — first deep collector ✅ done.
-Next: more F2 collectors (GPU beyond NVIDIA) or F3 (peripherals).
+**Phase:** F2 (deeper per-OS hardware) — ✅ **closed** (3 deep collectors).
+Next: **F3** (peripherals) — see the prepared handoff prompt.
 
 ## Current focus
 
-F2 opened with the first probe that reaches *past* psutil into firmware: a
-`baseboard` collector (motherboard / BIOS / serials, from the SMBIOS/DMI
-tables). Windows via PowerShell CIM, Linux via `/sys/class/dmi/id`, macOS via
-`system_profiler`, everything else `unsupported` — all degrading without
-raising. 42 tests green locally (was 24).
+F2 is done: three probes now reach *past* psutil into firmware — `baseboard`
+(board / BIOS / serials), `gpu` (now multi-vendor: AMD/Intel/iGPU + NVIDIA), and
+`memory_modules` (per-DIMM). All per-OS via `run_command`/sysfs, all degrade to
+`unsupported`/`unavailable` without raising. **88 tests green** locally (was 24).
 
-## Done (F2 — first deep collector)
+## Done (F2)
 
-- **`collectors/baseboard.py`** (ADR-009): motherboard / BIOS / serial + UUID.
-  - Windows → `Get-CimInstance` (Win32_BIOS / BaseBoard /
-    ComputerSystemProduct) → JSON, **not** deprecated `wmic`; 20 s budget.
-  - Linux → reads `/sys/class/dmi/id/` files directly (no `dmidecode`, no root
-    for identity; `PermissionError` on `*_serial`/`*_uuid` = elevation signal).
-  - macOS → `system_profiler SPHardwareDataType`.
-  - SMBIOS placeholder scrub ("To Be Filled By O.E.M.", all-`F` UUIDs, …) →
-    `None`. Elevation note fires only when *no* serial is readable unprivileged.
-- **`tests/test_baseboard.py`** — 18 offline cases: placeholder scrubbing,
-  Windows JSON parse + command-failure → UNAVAILABLE (not ERROR), Linux sysfs
-  via a tmp dir (incl. missing-serial → PARTIAL + note), macOS parse,
-  unsupported OS, and a live "never raises" guard.
-- **Verified on Windows** (live: real Lenovo SMBIOS, status `ok`) and via a
-  **WSL2 smoke run** (no DMI table there → clean `unavailable`, no crash).
+- **`collectors/baseboard.py`** (ADR-009): board / BIOS / serial + UUID. Windows
+  `Get-CimInstance` (not `wmic`); Linux `/sys/class/dmi/id` (no root for
+  identity; `PermissionError` on serial = elevation signal); macOS
+  `system_profiler`. Placeholder scrub; accurate elevation note.
+- **`collectors/gpu.py`** (ADR-010): rewritten to **multi-vendor**. Generic
+  enumerator (Windows `Win32_VideoController` CIM; Linux `lspci` → `/sys/class/
+  drm` PCI-ID fallback; macOS `SPDisplaysDataType`) + `nvidia-smi` kept as the
+  enrichment layer (NVIDIA from smi, the rest from the enumerator). Live: Intel
+  HD Graphics with VRAM + driver on this box.
+- **`collectors/memory_modules.py`** (ADR-010): per-DIMM (slot / size / speed /
+  type / mfr / part #). Windows `Win32_PhysicalMemory`; **Linux `dmidecode -t
+  memory`** — no unprivileged sysfs for SMBIOS type 17, so it needs root and
+  degrades to `unavailable` + root note (the *inverse* of baseboard); macOS
+  `SPMemoryDataType`. Live: 2×4 GB DDR3-1600 = 8 GB on this box.
+- **`collectors/_smbios.py`**: shared helper (sibling of `_psutil.py`) — CIM→JSON
+  (normalizes PowerShell single-object vs array) + SMBIOS placeholder scrub.
+- **Tests**: `test_baseboard.py` (18), `test_gpu.py` + `test_memory_modules.py`
+  (46 more) — parse, command-failure → UNAVAILABLE (not ERROR), Linux tmp-dir
+  sysfs / dmidecode parse, root-needed degrade, unsupported OS, never-raises.
+- **Verified**: live on Windows (baseboard Lenovo SMBIOS; Intel iGPU; DDR3
+  DIMMs) and via **WSL2 smoke** (no DMI/lspci/dmidecode → clean `unavailable`
+  with accurate notes, no crash).
 
 ## Prior phase (F1) — reference
 
@@ -37,22 +44,22 @@ F1 closed earlier: recursive text renderer (ADR-007), no-psutil path, exit
 codes (ADR-008), GitHub Actions matrix {ubuntu, windows} × {3.9, 3.13}, WSL
 smoke run. Was 24 tests; CI observed green (run 27347587254).
 
-## Next step (continue F2 / start F3)
+## Next step (F3 — peripherals)
 
-1. Second deep collector — natural pick: **GPU beyond NVIDIA** (AMD/Intel/iGPU),
-   following the same per-OS `run_command` + `unsupported` pattern. Or expand
-   `baseboard` with RAM-slot population (Win32_PhysicalMemory / DMI type 17).
-2. Or jump to **F3 peripherals** (USB / monitors / battery) reusing this
-   collector's per-OS dispatch shape.
-3. Keep the rule: degrade without raising, focused offline test, ADR if a
-   non-obvious choice is made.
+Flesh out the registered `peripherals` stub (currently `unsupported`): USB
+devices, monitors, input devices, battery/sensors — per-OS enumeration following
+the F2 dispatch shape (`_smbios.run_cim` on Windows, `run_command`/sysfs on
+Linux, `system_profiler` on macOS), degrading to `unsupported`/`unavailable`
+without raising, with an ADR for any non-obvious source choice. A dedicated
+handoff prompt is prepared for the F3 session.
 
 ## Notes / open points
 
-- New CI run for this push should stay green (no new deps; `baseboard` test is
-  offline). F1 run was green (run 27347587254).
-- `gpu` still `[n/a]` on this i3 box (no NVIDIA) — expected.
-- WSL2 exposes **no** `/sys/class/dmi/id` → `baseboard` is `unavailable` there;
-  the sysfs parse path is covered by offline tmp-dir tests instead.
+- CI should stay green (no new deps; all new tests are offline). Prior runs green.
+- `gpu` now reports the **Intel iGPU** on this i3 box (was `[n/a]` when
+  NVIDIA-only). `memory_modules` shows the 2×4 GB DDR3 sticks.
+- WSL2 exposes no DMI / `lspci` / `dmidecode` → the three deep collectors are
+  `unavailable` there (verified); their parse paths are covered by offline
+  tmp-dir / canned-output tests instead.
 - WSL has no `pip`, so pytest wasn't run there; CI's ubuntu job covers
   pytest-on-Linux. The WSL CLI run was enough to confirm cross-OS execution.

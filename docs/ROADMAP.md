@@ -27,18 +27,23 @@
   fallback for real). 24 tests green. CI will confirm green on the GitHub
   runners on first push.
 
-## F2 — Deeper hardware (per-OS)  🟡 in progress (first collector done, 2026-06-11)
+## F2 — Deeper hardware (per-OS)  ✅ (2026-06-11)
 
 - **Objective:** go beyond what psutil exposes.
 - **How:** GPU for AMD/Intel/integrated; motherboard / BIOS / RAM slots /
   serials via WMI (Windows), `dmidecode`/`lshw` (Linux), `system_profiler`
   (macOS) — all through `core.platform.run_command`. Surface privilege caveats.
-- **DoD:** at least one new deep collector working on its OS, with a graceful
-  `unsupported`/`partial` everywhere else and a note about elevation.
-- **Done so far:** ✅ `baseboard` (motherboard / BIOS / serials) — Windows CIM,
-  Linux sysfs DMI, macOS `system_profiler`, else `unsupported` (ADR-009).
-  Verified on Windows (live) + WSL2 smoke. **DoD met by this collector**; phase
-  stays open for the GPU-beyond-NVIDIA / RAM-slot follow-ups.
+- **DoD:** ✅ three deep collectors, each working on its OS and degrading to a
+  graceful `unsupported`/`unavailable`/`partial` elsewhere with elevation notes:
+  - `baseboard` — board / BIOS / serials (ADR-009): Windows CIM, Linux sysfs
+    DMI, macOS `system_profiler`.
+  - `gpu` — now **multi-vendor** (ADR-010): Windows `Win32_VideoController`,
+    Linux `lspci`→sysfs PCI-ID fallback, macOS `SPDisplaysDataType`, + NVIDIA
+    enriched via `nvidia-smi`.
+  - `memory_modules` — per-DIMM (ADR-010): Windows `Win32_PhysicalMemory`, Linux
+    `dmidecode -t memory` (root-gated), macOS `SPMemoryDataType`.
+  Shared `_smbios.py` helper (CIM→JSON + placeholder scrub). 88 tests green;
+  verified live on Windows + WSL2 smoke.
 
 ## F3 — Peripherals & extras
 

@@ -13,5 +13,6 @@ from . import (  # noqa: F401  (imported for the side effect of registering)
     network,
     gpu,
     baseboard,
+    memory_modules,
     peripherals,
 )

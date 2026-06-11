@@ -78,8 +78,9 @@ are explainable rather than silent.
 | `memory`      | ✅ | RAM + swap totals and usage |
 | `disk`        | ✅ | mounted partitions, filesystem, free space |
 | `network`     | ✅ | interfaces, MAC / IPv4 / IPv6, link state & speed, primary IP |
-| `gpu`         | ◐ | NVIDIA via `nvidia-smi`; AMD/Intel/integrated planned (F2) |
+| `gpu`         | ✅ | all vendors — Windows CIM / Linux `lspci`+sysfs / macOS; NVIDIA enriched via `nvidia-smi` |
 | `baseboard`   | ✅ | motherboard / BIOS / serials from SMBIOS — Windows CIM, Linux DMI, macOS `system_profiler` |
+| `memory_modules` | ✅ | physical DIMMs (slot / size / speed / type / part #) — Windows CIM, Linux `dmidecode`, macOS |
 | `peripherals` | ◻ | USB / monitors / input devices — planned (F3) |
 
 Output formats: **text** (default), **JSON** (`--json`), **HTML** (`--html`).
@@ -95,14 +96,14 @@ generically. Adding a collector is one new module; nothing in the CLI or the
 renderers changes. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 `psutil` is the cross-platform backbone (CPU/memory/disk/network); OS-specific
-sources (`nvidia-smi`, PowerShell CIM / `/sys/class/dmi` / `system_profiler`)
-fill the gaps the portable layer can't reach. The tool degrades gracefully if
-`psutil` is absent.
+sources (PowerShell CIM / `nvidia-smi` / `lspci` / `/sys/class/dmi` /
+`dmidecode` / `system_profiler`) fill the gaps the portable layer can't reach.
+The tool degrades gracefully if `psutil` is absent.
 
 ## Roadmap (short)
 
-- **F2** — deeper per-OS hardware: `baseboard` (motherboard / BIOS / serials)
-  shipped; GPU beyond NVIDIA and RAM-slot detail next.
+- **F2** ✅ — deeper per-OS hardware: `baseboard` (motherboard / BIOS / serials),
+  multi-vendor `gpu`, and `memory_modules` (per-DIMM) shipped.
 - **F3** — peripherals (USB, monitors, input).
 - **F4** — richer interactive HTML report.
 - **F5** — packaged single-file binaries per OS (PyInstaller) for the USB-stick workflow.

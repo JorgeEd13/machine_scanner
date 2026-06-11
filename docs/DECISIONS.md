@@ -127,3 +127,36 @@ is strictly better here (no root, no subprocess, no locale parsing) — the
 Windows and macOS paths still go through the guarded `run_command`. Verified on
 Windows (live Lenovo SMBIOS read) and via a WSL2 smoke run (no DMI table there →
 clean `UNAVAILABLE`).
+
+## ADR-010 — Multi-vendor GPU + physical RAM modules: enumerate generically, enrich NVIDIA, accept root where it's the only door
+
+**Context.** Closing F2 needs two more deep collectors: GPU **beyond NVIDIA**
+(AMD / Intel / integrated) and the **physical RAM modules** (per-DIMM). The
+existing `gpu` collector only knew `nvidia-smi`. Picking sources reopens the
+ADR-009 question — but the answer isn't the same for every probe.
+**Decision.**
+- **GPU — two layers.** A *generic enumerator* lists every adapter per OS
+  (`Win32_VideoController` CIM on Windows; `lspci` on Linux, falling back to
+  `/sys/class/drm/*/device/vendor` PCI IDs when `pciutils` is absent;
+  `system_profiler SPDisplaysDataType` on macOS). `nvidia-smi` stays as an
+  *enrichment* layer: NVIDIA cards are reported from `nvidia-smi` (live VRAM /
+  temp / driver) and everything else from the generic enumerator, so the richer
+  source wins for NVIDIA without losing the others. Here `lspci` **earns** its
+  use over sysfs (unlike ADR-009) because it resolves human adapter *names* that
+  raw PCI IDs can't — the sysfs path is only a degraded, names-less fallback.
+- **RAM modules — root is the only door on Linux.** Windows uses
+  `Win32_PhysicalMemory` (CIM); macOS uses `system_profiler SPMemoryDataType`.
+  Linux uses **`dmidecode -t memory`** — and here, *unlike* `baseboard`, there
+  is **no unprivileged sysfs equivalent** for SMBIOS type 17, so the collector
+  legitimately needs root and degrades to `UNAVAILABLE` with a "run as root"
+  note when it can't read it. The ADR-009 "prefer sysfs" rule is a *preference
+  where sysfs exists*, not a ban on `dmidecode` when it's the only option.
+- A shared `collectors/_smbios.py` helper (sibling of `_psutil.py`) centralizes
+  the PowerShell-CIM-to-JSON call (normalizing PowerShell's single-object vs
+  array output to a list) and the SMBIOS placeholder scrub.
+**Consequences.** `gpu` now reports AMD/Intel/iGPU, not just NVIDIA; the showcase
+no longer shows a half-done collector. The two probes show the *judgement* in
+ADR-009 rather than a dogma: choose sysfs when it's strictly better (`baseboard`),
+`lspci` when it adds names (`gpu`), `dmidecode`+root when nothing else exists
+(`memory_modules`). Verified live on Windows (Intel iGPU; 2×4 GB DDR3-1600) and
+via WSL2 smoke (no `lspci`/`dmidecode` → clean `UNAVAILABLE` with accurate notes).
