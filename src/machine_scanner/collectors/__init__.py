@@ -12,5 +12,6 @@ from . import (  # noqa: F401  (imported for the side effect of registering)
     disk,
     network,
     gpu,
+    baseboard,
     peripherals,
 )

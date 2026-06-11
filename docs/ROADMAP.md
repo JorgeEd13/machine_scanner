@@ -27,7 +27,7 @@
   fallback for real). 24 tests green. CI will confirm green on the GitHub
   runners on first push.
 
-## F2 — Deeper hardware (per-OS)
+## F2 — Deeper hardware (per-OS)  🟡 in progress (first collector done, 2026-06-11)
 
 - **Objective:** go beyond what psutil exposes.
 - **How:** GPU for AMD/Intel/integrated; motherboard / BIOS / RAM slots /
@@ -35,6 +35,10 @@
   (macOS) — all through `core.platform.run_command`. Surface privilege caveats.
 - **DoD:** at least one new deep collector working on its OS, with a graceful
   `unsupported`/`partial` everywhere else and a note about elevation.
+- **Done so far:** ✅ `baseboard` (motherboard / BIOS / serials) — Windows CIM,
+  Linux sysfs DMI, macOS `system_profiler`, else `unsupported` (ADR-009).
+  Verified on Windows (live) + WSL2 smoke. **DoD met by this collector**; phase
+  stays open for the GPU-beyond-NVIDIA / RAM-slot follow-ups.
 
 ## F3 — Peripherals & extras
 

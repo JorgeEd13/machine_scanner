@@ -93,3 +93,37 @@ is `ERROR` (a collector raised — a genuine bug). `partial` / `unavailable` /
 **Consequences.** CI and shell callers get a meaningful signal that mirrors the
 `Status` enum (ADR-004) without parsing output. Expected hardware gaps never
 trip an automated check.
+
+## ADR-009 — Firmware identity: CIM (not `wmic`) on Windows, sysfs (not `dmidecode`) on Linux
+
+**Context.** The first "deeper than psutil" collector (`baseboard`: motherboard
+/ BIOS / serials, read from the SMBIOS/DMI tables) needs a per-OS source. The
+obvious textbook commands are `wmic` on Windows and `dmidecode` on Linux, but
+both are poor choices today: `wmic` is **deprecated and absent from recent
+Windows builds**, and `dmidecode` needs **root** (it reads `/dev/mem`) and is
+not always installed.
+**Decision.**
+- **Windows** — query `Win32_BIOS` / `Win32_BaseBoard` /
+  `Win32_ComputerSystemProduct` through **PowerShell CIM** (`Get-CimInstance …
+  | ConvertTo-Json`), parsed as JSON. A single PowerShell pass with a 20 s
+  budget (start-up + three CIM queries can exceed the default 5 s).
+- **Linux** — read the kernel-exported DMI table files under
+  **`/sys/class/dmi/id/`** directly. The identity fields are world-readable with
+  no binary dependency; only the `*_serial` / `*_uuid` files are root-only
+  (mode 0400), so a `PermissionError` there is the *precise* elevation signal.
+- **macOS** — `system_profiler SPHardwareDataType` via `run_command`.
+- **other** — `UNSUPPORTED`.
+SMBIOS placeholder junk ("To Be Filled By O.E.M.", "Default string",
+all-`F` UUIDs, …) is scrubbed to `None` so a blank field reads as genuinely
+unknown. The elevation note fires only when **no** serial/UUID at all is
+readable while unprivileged (a systematic block) — a single empty board-serial
+is just unpopulated firmware, not a permission problem.
+**Consequences.** Works unprivileged for the common case on both major OSes,
+with an honest, *accurate* "run elevated for serials" note when (and only when)
+elevation would actually help. No dependency on deprecated/absent binaries.
+The Linux path is plain file I/O rather than `run_command`; that is a
+deliberate exception to the "probe via `run_command`" convention because sysfs
+is strictly better here (no root, no subprocess, no locale parsing) — the
+Windows and macOS paths still go through the guarded `run_command`. Verified on
+Windows (live Lenovo SMBIOS read) and via a WSL2 smoke run (no DMI table there →
+clean `UNAVAILABLE`).
