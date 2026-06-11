@@ -62,9 +62,13 @@
   - **`input`**: `Win32_Keyboard`+`Win32_PointingDevice` / `/proc/bus/input/
     devices` / macOS `unsupported`.
   - **`audio`**: `Win32_SoundDevice` / `/proc/asound/cards` / `SPAudioDataType`.
-- **Queued extras (same pattern, not yet built):** **Bluetooth** (`Win32_PnPEntity`
-  BT class · `bluetoothctl` · `SPBluetoothDataType`) and **printers**
-  (`Win32_Printer` · `lpstat` · `SPPrintersDataType`).
+- **Extras ✅ (2026-06-11):** two more sibling collectors on the same pattern —
+  **`bluetooth`** (`Win32_PnPEntity` BT class · `bluetoothctl`+`/sys/class/
+  bluetooth` · `SPBluetoothDataType`; adapters *and* paired devices as separate
+  levels, ADR-014) and **`printers`** (`Win32_Printer` · `lpstat -p`/`-d` CUPS ·
+  `SPPrintersDataType`). 19 offline tests (204 total green). Verified live on
+  Windows (no BT radio → clean `unavailable`; 9 print queues, default flagged)
+  and WSL2 (no BT stack / no CUPS → clean `unavailable`, zero ERROR). See ADR-014.
 
 ## F2.x — Physical storage drives  ✅ (2026-06-11)
 

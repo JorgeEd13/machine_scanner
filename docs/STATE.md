@@ -3,12 +3,44 @@
 > Volatile, short. Update at the end of each step.
 
 **Date:** 2026-06-11
-**Phase:** F2.x (physical storage drives) — ✅ **closed**. A new `storage_devices`
-sibling collector (ADR-013) reaches past psutil's `disk` into the physical
-drives. Next: **F4** (richer HTML + scan diff), or the queued F3 extras
-(Bluetooth, printers).
+**Phase:** F3-extras (`bluetooth` + `printers`) — ✅ **closed**. Two more
+peripheral sibling collectors (ADR-014 for the non-obvious Bluetooth choice),
+shipped together like the F3 five. With this the F3 bucket is fully done. Next:
+**F4** (richer HTML + scan diff) — the next numbered phase.
 
-## Current focus (F2.x)
+## Current focus (F3-extras)
+
+Two new sibling sections on the established ADR-012 pattern (own module + section
++ test file each, registered in `collectors/__init__.py`):
+
+- **`bluetooth`** (ADR-014) — reports the radio and the paired peers as **two
+  separate levels**: data is `{"adapters": [...], "devices": [...]}` (+ counts);
+  a radio with no paired devices is still `ok`, only *neither* → `unavailable`.
+  - **Windows** `Win32_PnPEntity` where `PNPClass='Bluetooth'` (CIM, `@()`-wrapped
+    to tell "no BT" from a query failure); rows split by `PNPDeviceID` —
+    `DEV_<mac>` → paired device, `BTHENUM\{guid}_…` service node dropped, else the
+    adapter.
+  - **Linux** `bluetoothctl devices` (device level — it resolves remote *names*
+    sysfs can't) **complemented** by `/sys/class/bluetooth/hci*` (adapter level);
+    no daemon / no `hciX` → clean `unavailable`.
+  - **macOS** `SPBluetoothDataType` (nested controller + Connected/Not Connected).
+- **`printers`** (no ADR — straightforward ADR-011 shape): **Windows**
+  `Win32_Printer` (name/default/port/driver/shared/network/offline, `@()`-wrapped);
+  **Linux** `lpstat -p` + `-d` (CUPS; no `lpstat`/no cupsd → clean `unavailable`);
+  **macOS** `SPPrintersDataType`.
+
+**204 tests green** (was 185; +19). Never raise; UNAVAILABLE/UNSUPPORTED with
+accurate notes.
+
+### Verified
+- **Windows live**: `bluetooth` → clean **`unavailable`** ("no Bluetooth-class
+  devices", this desktop has no radio — correctly *not* an ERROR); `printers` →
+  **`ok`** with 9 real queues (HP DesignJet network printer flagged `default`,
+  Brother + virtual MS/OneNote/AnyDesk queues), all unprivileged.
+- **WSL2 smoke**: both → clean **`unavailable`** (no `/sys/class/bluetooth` + no
+  `bluetoothctl`; no CUPS/`lpstat`), zero ERROR.
+
+## Prior phase (F2.x) — reference
 
 `storage_devices` — the deep-hardware layer `disk` was missing (`disk` stays the
 psutil partitions/usage view, untouched). Its own sibling `Section` (ADR-012);
@@ -92,12 +124,9 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
 
 ## Next step
 
-Open directions (pick per session):
-- **F3 extras (queued)** — two more peripheral siblings on the same pattern:
-  **Bluetooth** (`Win32_PnPEntity` BT class · `bluetoothctl`/`/sys/class/bluetooth`
-  · `SPBluetoothDataType`) and **printers** (`Win32_Printer` · `lpstat -p` ·
-  `SPPrintersDataType`).
-- **F4 — richer HTML report + scan diff** (the next numbered phase).
+- **F4 — richer HTML report + scan diff** (the next numbered phase): collapsible
+  sections, search/filter, copy-as-JSON, and a diff between two saved scans. This
+  is now the head of the queue (F3 and its extras are done).
 
 ## Notes / open points
 

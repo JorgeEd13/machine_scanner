@@ -20,4 +20,6 @@ from . import (  # noqa: F401  (imported for the side effect of registering)
     audio,
     input_devices,
     battery,
+    bluetooth,
+    printers,
 )

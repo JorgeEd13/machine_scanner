@@ -286,3 +286,54 @@ Hyper-V virtual disks through the lsblk-JSON path → PARTIAL with the
 smartctl/root note, zero ERROR, exit 0). The `lsblk` JSON parse, the sysfs
 fallback, the SMART gate and the diskutil parser are all covered by offline
 tests (canned JSON, a tmp `/sys/block` tree, stubbed `run_cim`/`run_command`).
+
+## ADR-014 — Bluetooth: report adapters *and* paired devices as separate levels; `bluetoothctl` over sysfs for names
+
+**Context.** The first F3-extras collector (`bluetooth`) reopens the per-OS
+source question (ADR-009/010/011) plus one that is specific to Bluetooth: it has
+two genuinely different inventory levels — the local **radio/adapter** and the
+**paired/known remote devices** — and the per-OS sources expose them
+asymmetrically. Reporting only one level would be a lossy half-answer (an adapter
+with no paired list, or a device list with no proof of a radio).
+**Decision.**
+- **Keep both levels, in separate keys.** The section data is
+  `{"adapters": [...], "devices": [...]}` (+ counts), never a single flat blob.
+  A box with a radio but zero paired devices is still `ok` (adapters non-empty);
+  only *neither* degrades to `unavailable`. This mirrors the ADR-012 "honest
+  per-category status" reasoning one level deeper — adapter-present and
+  device-present are distinct facts a reader needs to tell apart.
+- **Source per OS** (same judgement as ADR-011, not a dogma):
+  - **Windows** — `Win32_PnPEntity` filtered to `PNPClass='Bluetooth'` via CIM
+    (the `usb` enumerator-filter shape, reusing `_smbios.run_cim`), wrapped in
+    `@()` so a radio-less box emits `[]` (clean "no Bluetooth-class devices")
+    rather than nothing (a query failure → `None`) — the `battery` `@()` trick.
+    Rows are split by `PNPDeviceID`: a remote/paired device carries
+    `DEV_<12-hex-mac>` (→ `devices`, MAC formatted `aa:bb:..`); a
+    `BTHENUM\{guid}_…` service/profile sub-node with no `DEV_` is noise (dropped);
+    anything else is the local radio (→ `adapters`).
+  - **Linux — `bluetoothctl devices` for the device level, `/sys/class/bluetooth`
+    for the adapter level.** `bluetoothctl` *earns* its use over sysfs (unlike
+    `baseboard`'s sysfs preference in ADR-009) for the same reason `lsusb`/`lspci`
+    do in ADR-010/011: it resolves remote **device names** that the kernel's
+    `/sys/class/bluetooth` (which only enumerates `hciX` adapters, not peers)
+    cannot. The two are *complementary, not fallbacks of each other*: adapters
+    always come from sysfs (no daemon needed), the paired list from
+    `bluetoothctl`. When `bluetoothctl` is absent or no controller is up
+    (`run_command` → `None`), the adapters still report from sysfs with an
+    explicit "no paired-device list" note; when sysfs has no `hciX` **and**
+    `bluetoothctl` yields nothing, the section is a clean `unavailable` (no radio
+    or no BT service) — never an error (ADR-003/004/008).
+  - **macOS** — `system_profiler SPBluetoothDataType` (a nested
+    `Bluetooth Controller:` block → adapter, plus `Connected:` / `Not Connected:`
+    device groups → devices).
+  - **other** — `unsupported`.
+**Consequences.** Bluetooth reports the radio and the paired peripherals as the
+two distinct things they are, on every OS, without a new dependency. Verified
+live on Windows (this desktop has no radio → clean `unavailable`, correctly *not*
+an error) and via WSL2 (no `/sys/class/bluetooth`, no `bluetoothctl` → clean
+`unavailable`, zero ERROR). The Windows BTHENUM classification, the
+`bluetoothctl` parse, the sysfs-adapter path and the macOS nested parse are all
+covered by offline tests (canned CIM rows, a tmp `hciX` tree, canned
+`bluetoothctl`/`system_profiler` text). *Printers*, shipped in the same phase,
+needed **no** ADR — `Win32_Printer` / `lpstat -p`+`-d` (CUPS) / `SPPrintersDataType`
+is the straightforward ADR-011 dispatch shape with no non-obvious choice.
