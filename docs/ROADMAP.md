@@ -66,16 +66,23 @@
   BT class · `bluetoothctl` · `SPBluetoothDataType`) and **printers**
   (`Win32_Printer` · `lpstat` · `SPPrintersDataType`).
 
-## F2.x — Physical storage drives  ⬜ (recorded gap)
+## F2.x — Physical storage drives  ✅ (2026-06-11)
 
 - **Objective:** close the deep-hardware gap `disk` leaves — `disk` reports
   psutil partitions/usage only, not the physical drives.
 - **How:** a `storage_devices` collector for drive **model / serial / firmware /
-  bus type (SSD/HDD/NVMe) / SMART health** — `Win32_DiskDrive` (Windows),
-  `lsblk -O`/`/sys/block` (Linux), `diskutil`/`SPNVMeDataType` (macOS), same
-  per-OS judgement as ADR-009/010.
-- **DoD:** physical drives enumerated per OS with graceful degrade; SMART health
-  where readable (note elevation if needed).
+  bus type (SSD/HDD/NVMe) / SMART health** — `MSFT_PhysicalDisk`
+  (+ `Win32_DiskDrive` fallback, `MSStorageDriver_FailurePredictStatus` SMART) on
+  Windows, `lsblk -d -b -O -J`/`/sys/block` (Linux, `smartctl` for SMART),
+  `diskutil info -all` (macOS), per ADR-013 (same judgement as ADR-009/010).
+- **DoD:** ✅ a `storage_devices` sibling section (ADR-012), separate from the
+  untouched psutil `disk`. Per drive: model / serial / firmware / size / bus /
+  media + health where readable; degrades to UNAVAILABLE/PARTIAL with an
+  elevation note, never raises. **42 offline tests** (canned `lsblk -J`, tmp
+  `/sys/block` tree, stubbed CIM/`run_command`); 185 total green. Verified live
+  on Windows (ADATA SATA SSD + SanDisk USB — bus/media/health unprivileged) and
+  WSL2 (4 Hyper-V virtual disks via lsblk → PARTIAL + smartctl/root note, exit 0).
+  See ADR-013.
 
 ## F4 — Richer HTML report
 

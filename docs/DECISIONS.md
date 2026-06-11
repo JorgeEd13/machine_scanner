@@ -235,3 +235,54 @@ name shipped earlier the same day — accepted, since the schema is easier to ge
 right now than after F4 consumes it. Net for F3: `usb` (ADR-011) + `monitors`
 (EDID), `battery`, `input`, `audio`; Bluetooth and printers remain queued as
 further siblings.
+
+## ADR-013 — Physical storage: MSFT_PhysicalDisk over Win32_DiskDrive; SMART is best-effort/elevated
+
+**Context.** The `disk` collector reports psutil partitions/usage only — not the
+*physical* drives behind them. F2.x adds a `storage_devices` sibling (one
+collector = one section, ADR-012) for drive model / serial / firmware / size /
+**bus type** (NVMe/SATA/USB) / **media type** (SSD/HDD) / **SMART health**. As
+with ADR-009/010, the per-OS source is a judgement call, and two choices were
+non-obvious: which Windows class to spine on, and how far to push SMART.
+**Decision.**
+- **Windows — `MSFT_PhysicalDisk` (`root\microsoft\windows\storage`) is the
+  spine, not `Win32_DiskDrive`.** Only `MSFT_PhysicalDisk` exposes `MediaType`
+  (SSD vs HDD) and `BusType` (NVMe/SATA/USB) as clean enums *plus* a
+  storage-stack `HealthStatus` — and it does so **without elevation**.
+  `Win32_DiskDrive` has no media type at all and only a coarse `InterfaceType`
+  (IDE/SCSI/USB — it reports NVMe drives as "SCSI"), so it is kept strictly as a
+  **fallback** for older Windows lacking the storage WMI provider
+  (model/serial/firmware/size, coarse bus, no media, with a note).
+- **SMART predictive-failure is best-effort and elevation-gated.** The raw bit
+  lives in `MSStorageDriver_FailurePredictStatus` (`root\wmi`) which typically
+  needs administrator. Its `InstanceName` is a SCSI port path that does **not**
+  carry the disk number, so per-drive correlation would be guesswork — we
+  therefore reduce it to a single fleet-wide "is *any* drive predicting failure"
+  signal surfaced as a section note, and rely on `MSFT_PhysicalDisk.HealthStatus`
+  for the per-drive `health`. When the query is blocked (None) and we are not
+  admin, the section degrades to **PARTIAL + an elevation note** (the
+  baseboard / memory_modules root-gating pattern). An empty-but-readable result
+  is *not* treated as "all healthy" (returns None, no claim) — honest over
+  convenient. Verified live: this desktop read both drives' identity and
+  `health: healthy` unprivileged; the predictive query returned empty without
+  admin, so it correctly did **not** gate to PARTIAL.
+- **Linux — `lsblk -d -b -O -J` (parse the JSON, not columns).** It resolves
+  model / serial / firmware (`rev`) / size (bytes via `-b`) / `rota` (HDD vs SSD)
+  / `tran` (bus) in one no-root call. `/sys/block/*` is the **fallback** when
+  `lsblk` is absent — bus-poor there (only the `nvme` naming is unambiguous
+  without `lspci`), so it carries a note. SMART via `smartctl -H -j` needs root;
+  unreadable → degrade with a note (and PARTIAL when privilege is the cause).
+- **macOS — `diskutil info -all`**, keeping only `Virtual: No` blocks
+  (media name / size / `Protocol` bus / `Solid State` flag / `SMART Status`).
+- **other — `UNSUPPORTED`.**
+- **`disk` is left untouched** — it stays the psutil partitions/usage view;
+  `storage_devices` is the deep-hardware layer beside it, not a replacement.
+**Consequences.** The deep-hardware gap `disk` left is closed without a new
+dependency. Bus/media type are honest enums on Windows and Linux; SMART is
+reported where it is genuinely readable and degrades to an accurate elevation
+note where it isn't, never to a false health claim. Verified live on Windows
+(ADATA SATA SSD + SanDisk USB, both with bus/media/health) and via WSL2 (4
+Hyper-V virtual disks through the lsblk-JSON path → PARTIAL with the
+smartctl/root note, zero ERROR, exit 0). The `lsblk` JSON parse, the sysfs
+fallback, the SMART gate and the diskutil parser are all covered by offline
+tests (canned JSON, a tmp `/sys/block` tree, stubbed `run_cim`/`run_command`).

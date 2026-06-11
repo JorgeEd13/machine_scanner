@@ -3,15 +3,47 @@
 > Volatile, short. Update at the end of each step.
 
 **Date:** 2026-06-11
-**Phase:** F3 (peripherals) — ✅ **closed** for **5 categories** (usb, monitors,
-battery, input, audio), each its own sibling section (ADR-012). Next: **F4**
-(richer HTML + scan diff), or the queued F3 extras (Bluetooth, printers).
+**Phase:** F2.x (physical storage drives) — ✅ **closed**. A new `storage_devices`
+sibling collector (ADR-013) reaches past psutil's `disk` into the physical
+drives. Next: **F4** (richer HTML + scan diff), or the queued F3 extras
+(Bluetooth, printers).
 
-## Current focus
+## Current focus (F2.x)
+
+`storage_devices` — the deep-hardware layer `disk` was missing (`disk` stays the
+psutil partitions/usage view, untouched). Its own sibling `Section` (ADR-012);
+per drive: model / serial / firmware / size_gb / **bus** (NVMe/SATA/USB) /
+**media** (SSD/HDD) / **health**. Per-OS source per ADR-013:
+
+- **Windows** — `MSFT_PhysicalDisk` (`root\microsoft\windows\storage`) is the
+  spine: clean MediaType + BusType enums **and** a no-admin storage-stack
+  `HealthStatus`. `Win32_DiskDrive` is the older-Windows fallback (no media,
+  coarse bus). SMART predictive-failure (`MSStorageDriver_FailurePredictStatus`,
+  `root\wmi`) is best-effort and admin-gated → PARTIAL + elevation note when
+  blocked; not correlated per-drive (InstanceName carries no disk number), so
+  reduced to a fleet-wide note.
+- **Linux** — `lsblk -d -b -O -J` (parse JSON: model/serial/`rev`/size/`rota`/
+  `tran`); `/sys/block/*` fallback when lsblk absent (bus-poor, noted). SMART via
+  `smartctl -H -j` needs root → PARTIAL + note when unreadable.
+- **macOS** — `diskutil info -all`, keeping only `Virtual: No` blocks.
+
+**185 tests green** (was 143; +42 for storage). Registered in
+`collectors/__init__.py`. Never raises; UNAVAILABLE/PARTIAL with accurate notes.
+
+### Verified
+- **Windows live**: ADATA SU650 (SATA/SSD) + SanDisk Cruzer Blade (USB) — full
+  model/serial/firmware/size + `health: healthy`, all **unprivileged**
+  (`elevated: false`). The SMART predictive query returned empty (no rows)
+  without admin, so it correctly did **not** false-gate to PARTIAL.
+- **WSL2 smoke**: lsblk exposes 4 Hyper-V virtual disks → enumerated via the
+  lsblk-JSON path; `smartctl` absent → clean **PARTIAL** with the root/smartctl
+  note, zero ERROR, exit 0.
+
+## Prior phase (F3) — reference
 
 F3 split into **per-category sibling collectors** (ADR-012) — not one grouped
 `peripherals` section. The original `peripherals` (USB) was **renamed to `usb`**
-(data key `usb`→`devices`). Five peripheral sections now ship, each with its own
+(data key `usb`→`devices`). Five peripheral sections ship, each with its own
 honest status and per-collector isolation:
 
 - **`usb`** (ADR-011): flat `{name, vendor_id, product_id, manufacturer}` keyed
@@ -65,10 +97,6 @@ Open directions (pick per session):
   **Bluetooth** (`Win32_PnPEntity` BT class · `bluetoothctl`/`/sys/class/bluetooth`
   · `SPBluetoothDataType`) and **printers** (`Win32_Printer` · `lpstat -p` ·
   `SPPrintersDataType`).
-- **F2.x — physical storage drives** (recorded in ROADMAP): a `storage_devices`
-  collector for drive **model / serial / firmware / bus (SSD/HDD/NVMe) / SMART**
-  — the real gap left by `disk` (psutil partitions only). `Win32_DiskDrive` ·
-  `lsblk`+`/sys/block` · `diskutil`.
 - **F4 — richer HTML report + scan diff** (the next numbered phase).
 
 ## Notes / open points
