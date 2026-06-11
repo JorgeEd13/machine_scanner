@@ -117,7 +117,22 @@
 - **Objective:** the "plug into anything" story, realistically.
 - **How:** PyInstaller one-file specs in `build/` per OS; a release workflow
   producing `machine-scanner-{win,linux,macos}`; a short stick layout doc.
-- **DoD:** a downloadable binary per OS that runs with no Python installed.
+- **Double-click default (binary UX):** when the **frozen** binary is run with
+  **no arguments** (i.e. double-clicked), it must not just flash a console — it
+  writes an HTML report to a file and opens it. Default name
+  **`machine_inventory.html`**, gated on `sys.frozen` + no-args so the normal
+  CLI default (text to stdout) is unchanged; also expose it as an explicit
+  `--report` flag for terminal users. Write next to the binary (cwd), open via
+  `webbrowser`.
+- **Localized filename (best-effort, pure stdlib):** the default report filename
+  is translated by a **small hardcoded language→name map** keyed on the detected
+  OS UI language (`locale` / Windows `GetUserDefaultUILanguage` / `$LANG`), English
+  as fallback: `en → machine_inventory`, `pt → inventario_de_maquina` (+ a few:
+  es/fr/de). So a PT-BR box yields `inventario_de_maquina.html`. **Filename only**
+  — report *content* stays English (the "English everywhere" rule + full i18n is
+  out of scope; parked under Ideas). No new deps, offline.
+- **DoD:** a downloadable binary per OS that runs with no Python installed; a
+  double-click on the binary produces (and opens) a localized-name HTML report.
 
 ## Ideas parked (not scheduled)
 
@@ -125,3 +140,6 @@
 - Export presets (CSV of partitions, a one-line summary for ticket systems).
 - A `--watch` mode for live metrics — likely out of scope (this is an inventory
   tool, not a monitor).
+- **Full report-content i18n** (translating section labels / values, not just the
+  filename) — deferred: it conflicts with the "English everywhere" rule and is a
+  real i18n effort. F5 only localizes the default *filename*.

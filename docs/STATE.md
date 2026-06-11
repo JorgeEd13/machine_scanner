@@ -139,6 +139,15 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
   release workflow producing `machine-scanner-{win,linux,macos}` + a short stick
   layout doc. DoD: a downloadable binary per OS that runs with no Python
   installed. (See ROADMAP F5.)
+  - **Added requirement (user, 2026-06-11):** double-clicking the **frozen**
+    binary with no args must **write + open an HTML report** (not flash a
+    console), default name **`machine_inventory.html`**, gated on `sys.frozen` +
+    no-args so the CLI text default is untouched (+ a `--report` flag). The
+    filename is **localized by a small hardcoded language→name map** keyed on the
+    OS UI language (en → `machine_inventory`, pt → `inventario_de_maquina`, +
+    es/fr/de), English fallback — **filename only, content stays English**
+    (full content i18n is out of scope, parked). Pure stdlib, offline. See
+    ROADMAP F5.
 
 ## Notes / open points
 
