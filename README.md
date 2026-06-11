@@ -81,7 +81,7 @@ are explainable rather than silent.
 | `gpu`         | ✅ | all vendors — Windows CIM / Linux `lspci`+sysfs / macOS; NVIDIA enriched via `nvidia-smi` |
 | `baseboard`   | ✅ | motherboard / BIOS / serials from SMBIOS — Windows CIM, Linux DMI, macOS `system_profiler` |
 | `memory_modules` | ✅ | physical DIMMs (slot / size / speed / type / part #) — Windows CIM, Linux `dmidecode`, macOS |
-| `peripherals` | ◻ | USB / monitors / input devices — planned (F3) |
+| `peripherals` | ✅ | USB devices (name + VID:PID) — Windows CIM, Linux `lsusb`/sysfs, macOS `system_profiler`; monitors / input planned |
 
 Output formats: **text** (default), **JSON** (`--json`), **HTML** (`--html`).
 The JSON doubles as an archivable audit artifact.
@@ -96,7 +96,7 @@ generically. Adding a collector is one new module; nothing in the CLI or the
 renderers changes. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 `psutil` is the cross-platform backbone (CPU/memory/disk/network); OS-specific
-sources (PowerShell CIM / `nvidia-smi` / `lspci` / `/sys/class/dmi` /
+sources (PowerShell CIM / `nvidia-smi` / `lspci` / `lsusb` / `/sys/class/dmi` /
 `dmidecode` / `system_profiler`) fill the gaps the portable layer can't reach.
 The tool degrades gracefully if `psutil` is absent.
 
@@ -104,7 +104,7 @@ The tool degrades gracefully if `psutil` is absent.
 
 - **F2** ✅ — deeper per-OS hardware: `baseboard` (motherboard / BIOS / serials),
   multi-vendor `gpu`, and `memory_modules` (per-DIMM) shipped.
-- **F3** — peripherals (USB, monitors, input).
+- **F3** ✅ — peripherals: USB devices shipped (per-OS, VID:PID); monitors / input optional follow-ups.
 - **F4** — richer interactive HTML report.
 - **F5** — packaged single-file binaries per OS (PyInstaller) for the USB-stick workflow.
 

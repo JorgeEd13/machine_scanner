@@ -45,12 +45,21 @@
   Shared `_smbios.py` helper (CIM→JSON + placeholder scrub). 88 tests green;
   verified live on Windows + WSL2 smoke.
 
-## F3 — Peripherals & extras
+## F3 — Peripherals & extras  ✅ (2026-06-11)
 
 - **Objective:** flesh out the registered `peripherals` stub.
 - **How:** USB devices, monitors, input devices, battery/sensors — per-OS
   enumeration following the F2 pattern.
-- **DoD:** `peripherals` returns real data on each OS (or honest `unsupported`).
+- **DoD:** ✅ `peripherals` returns real data on each OS (or honest gap). The
+  stub is now a real **USB devices** collector (ADR-011): Windows
+  `Win32_PnPEntity` (CIM), Linux `lsusb` → `/sys/bus/usb` fallback, macOS
+  `SPUSBDataType`; normalized to a flat `{name, vendor_id, product_id,
+  manufacturer}` list keyed by VID:PID; no elevation needed; degrades to a clean
+  `unavailable` (verified live on Windows + WSL2 smoke). 108 tests green.
+- **Follow-ups (same dispatch shape, optional):** monitors (`WmiMonitorID`/EDID
+  · `/sys/class/drm/*/edid` · `SPDisplaysDataType`), battery (`Win32_Battery` ·
+  `/sys/class/power_supply` · `pmset`), input devices. New categories add a key
+  to the `peripherals` section rather than a new collector.
 
 ## F4 — Richer HTML report
 

@@ -160,3 +160,43 @@ ADR-009 rather than a dogma: choose sysfs when it's strictly better (`baseboard`
 `lspci` when it adds names (`gpu`), `dmidecode`+root when nothing else exists
 (`memory_modules`). Verified live on Windows (Intel iGPU; 2×4 GB DDR3-1600) and
 via WSL2 smoke (no `lspci`/`dmidecode` → clean `UNAVAILABLE` with accurate notes).
+
+## ADR-011 — Peripherals (USB): VID:PID as the cross-OS identity, a flat list, hubs kept
+
+**Context.** F3 opens the `peripherals` stub. USB is the first category, and it
+raises three choices that aren't obvious: which source per OS, what the *record*
+should look like across very different outputs, and whether to model the USB
+*tree* (host controller → hub → device) or flatten it.
+**Decision.**
+- **Source per OS** (same judgement as ADR-009/010, not a dogma):
+  - **Windows** — `Win32_PnPEntity` via CIM, filtered to rows whose
+    `PNPDeviceID` is under the `USB` enumerator. (`Get-PnpDevice` would also
+    work but isn't a CIM class; staying on `Get-CimInstance` reuses
+    `_smbios.run_cim` and its JSON normalization.)
+  - **Linux** — `lsusb` first (it resolves vendor/device *names* from the USB
+    ID database that bare IDs can't), with a **`/sys/bus/usb/devices` fallback**
+    when `usbutils` is absent — a degraded, names-poorer path. This is the exact
+    `lspci`-vs-sysfs trade-off from ADR-010's GPU enumerator.
+  - **macOS** — `system_profiler SPUSBDataType`.
+- **Normalized record = `{name, vendor_id, product_id, manufacturer}` with the
+  16-bit VID:PID pair (lower-case hex) as the stable identity.** Every source
+  exposes VID/PID (Windows in the `PNPDeviceID`, Linux as `idVendor`/`idProduct`
+  or the `ID xxxx:yyyy` column, macOS as `Vendor ID`/`Product ID`), so it is the
+  one field that means the same thing everywhere and lets a reader cross-ref a
+  device regardless of the OS it was scanned on.
+- **Flat list, not the hub tree.** USB is physically a tree, but for an
+  *inventory* the tree adds nesting without adding inventory value; a flat list
+  of every node keyed by VID:PID is simpler to read and to diff (F4). **Hubs and
+  root hubs are kept, not filtered** — deciding which devices are "real
+  peripherals" vs "internal plumbing" is guesswork that risks dropping genuine
+  devices; honest over-inclusion beats a lossy heuristic. (macOS is the one
+  exception: its bus/controller *headers* carry no VID/PID at all, so they fall
+  out naturally — a node with neither ID is dropped.)
+- **No elevation needed** on any OS for USB enumeration, so — unlike `baseboard`
+  / `memory_modules` — there is no privilege note.
+**Consequences.** The `peripherals` section now shows real data instead of a
+roadmap placeholder. Verified live on Windows (Logitech receiver, a SanDisk mass
+-storage stick, Intel hubs — all with VID:PID) and via WSL2 smoke (no `lsusb`,
+no `/sys/bus/usb` → clean `UNAVAILABLE` with an accurate note, no crash). USB is
+the only category implemented this phase; monitors / battery / input devices are
+left as straightforward follow-ups using the same dispatch shape.
