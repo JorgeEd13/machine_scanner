@@ -27,7 +27,9 @@ locally (was 10).
   `tests/test_cli.py` plus output-path tests (`--list`, `--json`).
 - **CI**: `.github/workflows/ci.yml` — matrix `{ubuntu, windows} × {3.9, 3.13}`,
   `pip install -e .[dev]`, `pytest -v`, then a CLI smoke run (`--list`, text,
-  `--json`).
+  `--json`). **Observed GREEN on all 4 GitHub jobs** (run 27347587254, ~1m20s,
+  2026-06-11). Bumped `actions/checkout@v5` + `setup-python@v6` to clear the
+  Node-20 deprecation (forced to Node 24 on 2026-06-16).
 - **Cross-OS smoke run**: WSL Ubuntu (Python 3.12) ran `python -m
   machine_scanner` end-to-end — Linux OS detection correct, graceful psutil-less
   degradation, no crashes.
@@ -42,8 +44,7 @@ locally (was 10).
 
 ## Notes / open points
 
-- CI is written but **not yet observed green on GitHub runners** — that happens
-  on first push (repo not yet pushed). Local + WSL are green.
+- CI **confirmed green on GitHub** (4 jobs) — F1 DoD fully met.
 - `gpu` still `[n/a]` on this i3 box (no NVIDIA) — expected.
 - WSL has no `pip`, so pytest wasn't run there; CI's ubuntu job covers
   pytest-on-Linux. The WSL CLI run was enough to confirm cross-OS execution.
