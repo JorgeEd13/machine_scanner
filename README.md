@@ -1,10 +1,24 @@
-# machine_scanner
+<p align="center">
+  <img src="assets/logo.png" alt="machine_scanner" width="440">
+</p>
 
-A **portable, cross-platform machine inventory tool**. Drop it on a USB stick,
-plug it into any machine (Windows / Linux / macOS), and get a complete
-inventory of its **hardware, OS and network** — as plain text, JSON, or an
-**interactive, self-contained HTML report**. It can also **diff two saved
-scans** to show what changed on a machine over time.
+<h1 align="center">machine_scanner</h1>
+
+<p align="center"><em>Drop it on a USB stick, plug it into any machine, know exactly what it is.</em></p>
+
+<p align="center">
+  <a href="https://github.com/JorgeEd13/machine_scanner/actions/workflows/ci.yml"><img src="https://github.com/JorgeEd13/machine_scanner/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/JorgeEd13/machine_scanner/releases/latest"><img src="https://img.shields.io/github/v/release/JorgeEd13/machine_scanner?include_prereleases&sort=semver" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="Python 3.9+">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey" alt="Platforms">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
+</p>
+
+A **portable, cross-platform machine inventory tool**. Plug it into any machine
+(Windows / Linux / macOS) and get a complete inventory of its **hardware, OS and
+network** — as plain text, JSON, or an **interactive, self-contained HTML
+report**. It can also **diff two saved scans** to show what changed on a machine
+over time.
 
 Built for the "I need to know exactly what this box is" moment: auditing an
 unfamiliar machine, capturing a baseline before changes, or sizing a machine
@@ -40,6 +54,27 @@ file that boots on Windows, Linux and macOS alike. `machine_scanner` solves the
 on the same stick**. The same Python script also runs anywhere Python is
 present.
 
+## Download
+
+Grab the binary for your OS from the
+[**latest release**](https://github.com/JorgeEd13/machine_scanner/releases/latest)
+— no Python, no install:
+
+| OS | Binary | Run |
+|----|--------|-----|
+| Windows | `machine-scanner-windows.exe` | **Double-click** it, or run from a terminal |
+| Linux   | `machine-scanner-linux`       | `chmod +x machine-scanner-linux && ./machine-scanner-linux` |
+| macOS   | `machine-scanner-macos`       | `chmod +x machine-scanner-macos && ./machine-scanner-macos` |
+
+**Double-clicking the binary** (no arguments) scans the machine, writes a
+self-contained HTML report next to itself, and opens it in your browser — the
+filename follows the OS language (`machine_inventory.html`, or
+`inventario_de_maquina.html` on a PT-BR box). From a terminal you get the full
+CLI below. The binaries are **unsigned**, so SmartScreen / Gatekeeper may warn
+on first run — expected for an open-source tool; the source and the build
+workflow are right here in the repo. Drop all three on a stick and you have a
+scanner for any machine you meet. See [`build/README.md`](build/README.md).
+
 ## Install / run
 
 From source (any OS with Python ≥ 3.9):
@@ -62,6 +97,7 @@ PYTHONPATH=src python -m machine_scanner
 machine-scanner                      # human-readable report to stdout
 machine-scanner --json               # machine-readable JSON
 machine-scanner --html -o report.html   # interactive, self-contained HTML
+machine-scanner --report             # write an HTML report and open it (one-shot)
 machine-scanner --only cpu,memory,network
 machine-scanner --list               # list available collectors
 
@@ -142,8 +178,10 @@ two saved scans, displayed by separate text/HTML/JSON formatters.
   plus `bluetooth` and `printers`, each a sibling collector.
 - **F4** ✅ — interactive, self-contained HTML report (collapse / search /
   copy-as-JSON) + scan diff between two saved scans.
-- **F5** — packaged single-file binaries per OS (PyInstaller) for the USB-stick
-  workflow.
+- **F5** ✅ — packaged single-file binaries per OS (PyInstaller), a tag-triggered
+  release workflow, and the double-click → HTML report experience.
+
+All numbered phases are complete.
 
 Full plan in [`PLAN.md`](PLAN.md) and [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

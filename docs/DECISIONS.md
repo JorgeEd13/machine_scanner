@@ -381,6 +381,15 @@ rather than a `<pre>` blob. Verified live on Windows (a real 16-section scan →
 0 external references, 16 native-collapsible cards, copy + search wired, 0 `<pre>`
 dumps) and via WSL2 (same, plus the diff renderer self-contained), zero ERROR.
 
+*Favicon addendum (2026-06-12).* The report now carries the project's brand
+hypercube as a **favicon inlined as a `data:image/png;base64,…` URI** in `<head>`.
+A `data:` URI is **not** an external fetch — it travels inside the single file —
+so it keeps the ADR-015 self-containment promise intact. The self-containment
+test was refined accordingly: it no longer bans `src=`/`href=` outright (a blunt
+proxy) but asserts every `src`/`href` value **starts with `data:`** (plus the
+existing `http(s)` ban). The favicon PNG is derived from the project logo; if a
+future asset is added it must likewise be a `data:` URI or the test fails.
+
 *Diffing itself (`diff_scans`)* needed no separate ADR for its mechanics, but
 two of its choices are worth recording here: it is a **pure, renderer-agnostic
 compute** (preserving the ADR-002 separation — the diff computes a structure,

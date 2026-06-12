@@ -14,6 +14,10 @@ OS, built from one spec**, plus the raw Python script wherever Python exists.
 - [`entrypoint.py`](entrypoint.py) — thin entry script (absolute import of
   `machine_scanner.cli:main`); a PyInstaller entry runs as `__main__`, so the
   package's relative-import `__main__.py` can't be the target.
+- `machine_scanner.ico` — the brand hypercube as a multi-resolution Windows icon
+  (16–256 px; the small sizes use a bolder crop of the cyan inner cube so the
+  mark survives at 16 px). Derived from the project logo, committed as a binary
+  asset. The same mark is inlined as the HTML report's favicon (ADR-015 addendum).
 
 Build output (`dist/`, `build/<name>/`) is git-ignored — binaries are built by
 the release workflow, never committed.

@@ -172,20 +172,32 @@ F1 closed earlier: recursive text renderer (ADR-007), no-psutil path, exit
 codes (ADR-008), GitHub Actions matrix {ubuntu, windows} × {3.9, 3.13}, WSL
 smoke run. Was 24 tests; CI observed green (run 27347587254).
 
+## Post-F5 polish (2026-06-12) — brand + release
+
+- **Brand assets landed** (from the better source logos in
+  `(private career repo)`, processed with Pillow — crop to the bright cyan
+  inner cube, contrast/saturation boost, **bolded for the small sizes so the
+  mark survives at 16 px**): `build/machine_scanner.ico` (multi-res 16–256,
+  auto-embedded by the spec, rebuilt + confirmed in the Windows exe),
+  `assets/logo.png` (README hero — full hypercube, tagline cropped off), and the
+  **HTML report favicon** inlined as a `data:` URI (ADR-015 favicon addendum;
+  self-containment test refined to allow `data:` URIs, +1 test → **240 green**).
+- **README polished**: hero image, badges (CI / release / python / platform /
+  license), a **Download** table pointing at the Releases binaries, the
+  double-click UX note, F5 marked ✅.
+- **GitHub topics set** (hardware-inventory, system-information, cross-platform,
+  cli, python, psutil, pyinstaller, diagnostics, sysadmin, clean-room, …).
+
 ## Next step
 
-- **All numbered phases (F0–F5) are done.** What remains is **polish / showcase**,
-  not a numbered phase:
-  - **Cut a `v0.1.0` tag** to actually produce the Linux + macOS binaries via
-    `release.yml` (the Windows one is verified locally; the cross-OS ones only
-    exist once a tag fires the workflow). Confirm the Release has all three.
-  - **README hero image** (the brand logo, `reference_brand_logo` — pending a
-    refined high-contrast variant; the spec auto-embeds `build/machine_scanner.ico`
-    if/when one is added — no spec change needed).
-  - **Demo GIF** of a scan + the HTML report (the receivables-agent ship-gate
-    pattern).
-  - Parked under ROADMAP Ideas: full report-content i18n (only the filename is
-    localized today).
+- **Cut `v0.1.0`** (validate-then-tag): run `release.yml` via `workflow_dispatch`
+  first to confirm the 3-OS build (no public artifact), then push the tag to mint
+  the GitHub Release with `machine-scanner-{windows.exe,linux,macos}`. The
+  Windows binary is verified locally; the Linux/macOS ones come from the runners.
+- **Demo GIF** of a scan + the HTML report — deferred to Jorge's personal machine.
+- A **refined high-contrast square logo variant** would sharpen the 16 px icon
+  further (the current crop is good, not perfect); drop a new `.ico` in and the
+  spec picks it up. Parked under ROADMAP Ideas: full report-content i18n.
 
 ## Notes / open points
 

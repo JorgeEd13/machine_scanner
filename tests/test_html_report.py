@@ -49,12 +49,18 @@ def test_html_is_self_contained_no_external_assets():
     # No remote protocols anywhere.
     assert "http://" not in out
     assert "https://" not in out
-    # No external resource references — every src/href would have to be remote
-    # here (we ship no local assets), so none are allowed at all.
-    assert not re.search(r"\bsrc\s*=", out)
-    assert not re.search(r"\bhref\s*=", out)
+    # Any src/href must be an inline ``data:`` URI (e.g. the favicon), never a
+    # remote fetch — the report stays one self-contained file (ADR-015).
+    for m in re.finditer(r"""\b(?:src|href)\s*=\s*(['"])(.*?)\1""", out):
+        assert m.group(2).startswith("data:"), f"external asset ref: {m.group(2)[:50]}"
     # CSS and JS are inlined.
     assert "<style>" in out and "<script>" in out
+
+
+def test_favicon_is_inlined_data_uri():
+    out = to_html(_inventory())
+    assert "rel='icon'" in out
+    assert "href='data:image/png;base64," in out
 
 
 def test_interactive_scaffolding_present():
