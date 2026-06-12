@@ -79,3 +79,54 @@ def test_diff_html_to_file(tmp_path, capsys):
 def test_diff_missing_file_errors(tmp_path):
     old = _write_scan(tmp_path / "old.json", 4)
     assert cli.main(["--diff", old, str(tmp_path / "nope.json")]) == cli.EXIT_COLLECTOR_ERROR
+
+
+# --- report mode (the double-click / --report experience, ADR-017) ----------
+
+
+def test_report_flag_writes_html_and_opens(monkeypatch, tmp_path):
+    _stub_scan(monkeypatch, Section("cpu", "CPU", Status.OK, {"cores_logical": 4}))
+    opened = []
+    monkeypatch.setattr(cli.webbrowser, "open", lambda uri: opened.append(uri) or True)
+    out_file = tmp_path / "r.html"
+    assert cli.main(["--report", "-o", str(out_file)]) == cli.EXIT_OK
+    html = out_file.read_text(encoding="utf-8")
+    assert html.startswith("<!doctype html>")
+    assert len(opened) == 1  # browser open attempted exactly once
+
+
+def test_report_default_filename_is_localized(monkeypatch, tmp_path):
+    _stub_scan(monkeypatch, Section("cpu", "CPU", Status.OK, {"cores_logical": 4}))
+    monkeypatch.setattr(cli.webbrowser, "open", lambda uri: True)
+    monkeypatch.setattr(cli, "report_filename", lambda: "inventario_de_maquina.html")
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["--report"]) == cli.EXIT_OK
+    assert (tmp_path / "inventario_de_maquina.html").exists()
+
+
+def test_frozen_no_args_triggers_report(monkeypatch, tmp_path):
+    _stub_scan(monkeypatch, Section("cpu", "CPU", Status.OK, {"cores_logical": 4}))
+    monkeypatch.setattr(cli, "_is_frozen", lambda: True)
+    monkeypatch.setattr(cli.webbrowser, "open", lambda uri: True)
+    monkeypatch.setattr(cli, "report_filename", lambda: "machine_inventory.html")
+    monkeypatch.chdir(tmp_path)
+    assert cli.main([]) == cli.EXIT_OK  # no args + frozen -> report mode
+    assert (tmp_path / "machine_inventory.html").exists()
+
+
+def test_frozen_with_args_keeps_normal_cli(monkeypatch, capsys):
+    # A terminal run of the binary with a flag must behave like the script.
+    _stub_scan(monkeypatch, Section("cpu", "CPU", Status.OK, {"cores_logical": 4}))
+    monkeypatch.setattr(cli, "_is_frozen", lambda: True)
+    cli.main(["--json"])
+    assert '"cores_logical": 4' in capsys.readouterr().out
+
+
+def test_non_frozen_no_args_stays_text(monkeypatch, capsys):
+    # The normal CLI default (text to stdout) is untouched when not frozen.
+    _stub_scan(monkeypatch, Section("cpu", "CPU", Status.OK, {"cores_logical": 4}))
+    monkeypatch.setattr(cli, "_is_frozen", lambda: False)
+    assert cli.main([]) == cli.EXIT_OK
+    out = capsys.readouterr().out
+    assert "CPU" in out
+    assert "<!doctype html>" not in out  # text, not the report-mode HTML

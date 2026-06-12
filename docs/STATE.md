@@ -2,13 +2,52 @@
 
 > Volatile, short. Update at the end of each step.
 
-**Date:** 2026-06-11
-**Phase:** F4 (richer interactive HTML + scan diff) — ✅ **closed** (both
-deliverables landed in one session). ADR-015 for the interactivity choice.
-Next: **F5** (packaged PyInstaller binaries per OS) — the last numbered phase
-and now the head of the queue.
+**Date:** 2026-06-12
+**Phase:** F5 (packaged PyInstaller binaries per OS — the USB-stick deliverable)
+— ✅ **closed**. The **last numbered phase**; all of F0–F5 are now done. ADR-017
+(frozen no-args report mode + localized filename) and ADR-018 (one-file /
+collector discovery / unsigned) for the choices. Next session = polish/showcase
+(README hero image, demo GIF, logo refinement), **not** a numbered phase.
 
-## Current focus (F4) — done
+## Current focus (F5) — done
+
+Three deliverables, all landed this session:
+
+1. **Frozen double-click UX + `--report` + localized filename** (ADR-017,
+   `report_name.py` + `cli.py`). A double-clicked binary (gated on
+   `sys.frozen` **and** no args) scans → writes a self-contained HTML report →
+   opens it; the CLI text default is untouched. `--report` exposes the same
+   one-shot from a terminal. The **default filename is localized by OS language**
+   (`en → machine_inventory`, `pt → inventario_de_maquina`, + es/fr/de, English
+   fallback) — **filename only, content stays English**. Pure stdlib, never
+   raises. **+12 offline tests** (`test_report_name.py` + 5 CLI routing tests).
+2. **PyInstaller one-file spec + Windows binary** (ADR-018,
+   `build/machine_scanner.spec` + `build/entrypoint.py`). One spec → one binary
+   per OS (names itself `machine-scanner-{windows.exe,linux,macos}` from the
+   build OS). `pyinstaller` is a build-time-only `[build]` extra (ADR-001: psutil
+   stays the single runtime dep, not in `requirements.txt`). **Built + verified
+   live on this Windows box** (see below).
+3. **Release workflow** (`.github/workflows/release.yml`) — tag-triggered (`v*`),
+   builds on windows/ubuntu/macos-latest, **per-OS smoke test asserts `--list`
+   shows all 16**, uploads the three to a GitHub Release. Separate from `ci.yml`
+   (no test-matrix duplication). Plus the **USB-stick layout doc** (rewritten
+   `build/README.md`: three binaries + `src/` Python fallback + plug-into-
+   anything usage + unsigned/first-run caveats).
+
+### Verified (F5, Windows live)
+Built `dist/machine-scanner-windows.exe` (**7.4 MB**) and ran it from a **clean
+shell (no venv, no PYTHONPATH)**: `--list` → **all 16 collectors**, exit 0 (the
+self-registration risk, ADR-002/018, cleared); `--json` exit 0; `--html -o`
+→ `<!doctype html>`, **0 external refs** (ADR-015 holds frozen); `--diff` of two
+UTF-8 scans → exit 0, diff rendered; `--report` exit 0. **No-args double-click on
+this pt-BR box wrote `inventario_de_maquina.html`** (localized!) and opened it,
+exit 0. Startup: ~15 s cold (one-file temp-extract + Defender), ~3 s warm.
+**Linux + macOS binaries are NOT buildable here** (no Mac; WSL has no `pip`) —
+they are produced by the release workflow's runners on a `v*` tag. **239 tests
+green** (was 227 pre-F5; +12 F5 tests). CI untouched (no new runtime dep; all
+new tests offline).
+
+## Prior phase (F4) — reference
 
 Two deliverables, both shipped:
 
@@ -135,20 +174,18 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
 
 ## Next step
 
-- **F5 — packaged binaries (USB-stick deliverable)** — the last numbered phase,
-  now the head of the queue. PyInstaller one-file specs in `build/` per OS + a
-  release workflow producing `machine-scanner-{win,linux,macos}` + a short stick
-  layout doc. DoD: a downloadable binary per OS that runs with no Python
-  installed. (See ROADMAP F5.)
-  - **Added requirement (user, 2026-06-11):** double-clicking the **frozen**
-    binary with no args must **write + open an HTML report** (not flash a
-    console), default name **`machine_inventory.html`**, gated on `sys.frozen` +
-    no-args so the CLI text default is untouched (+ a `--report` flag). The
-    filename is **localized by a small hardcoded language→name map** keyed on the
-    OS UI language (en → `machine_inventory`, pt → `inventario_de_maquina`, +
-    es/fr/de), English fallback — **filename only, content stays English**
-    (full content i18n is out of scope, parked). Pure stdlib, offline. See
-    ROADMAP F5.
+- **All numbered phases (F0–F5) are done.** What remains is **polish / showcase**,
+  not a numbered phase:
+  - **Cut a `v0.1.0` tag** to actually produce the Linux + macOS binaries via
+    `release.yml` (the Windows one is verified locally; the cross-OS ones only
+    exist once a tag fires the workflow). Confirm the Release has all three.
+  - **README hero image** (the brand logo, `reference_brand_logo` — pending a
+    refined high-contrast variant; the spec auto-embeds `build/machine_scanner.ico`
+    if/when one is added — no spec change needed).
+  - **Demo GIF** of a scan + the HTML report (the receivables-agent ship-gate
+    pattern).
+  - Parked under ROADMAP Ideas: full report-content i18n (only the filename is
+    localized today).
 
 ## Notes / open points
 

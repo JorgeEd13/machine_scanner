@@ -426,3 +426,87 @@ strips a BOM; the accented round-trip survives). Verified live on Windows
 (`input` → `Aperfeiçoado`, `padrão`; no `‡`/`Æ` bytes in the JSON). The general
 rule this sets: **never rely on the platform default code page for subprocess
 text — pin UTF-8 and make the child emit it too.**
+
+## ADR-017 — Frozen no-args writes+opens an HTML report; default filename localized by OS language
+
+**Context.** F5 ships the tool as a double-clickable binary. A double-clicked
+console app that scans, prints text to stdout and exits just **flashes a console
+window and closes** — the user sees nothing. The packaged binary needs a useful
+default action when launched with no arguments, *without* changing the script's
+long-standing CLI default (text to stdout — every test and the README rely on
+it). Separately, a bare `machine_inventory.html` reads oddly on a non-English
+desktop; a localized *filename* is a cheap, honest touch.
+**Decision.**
+- **A `--report` one-shot mode**: scan → write a self-contained HTML report to a
+  file → open it with `webbrowser`. Browser-open is best-effort (a headless box
+  still gets the file; `webbrowser.open` failures are swallowed). The run still
+  returns exit 2 if any collector errored (ADR-008 preserved).
+- **Gate the implicit trigger on `sys.frozen` *and* no args.** Report mode fires
+  automatically only when `getattr(sys, "frozen", False)` is true **and** there
+  were no CLI arguments — i.e. a double-clicked binary. A frozen binary run
+  *with* args (`machine-scanner-windows.exe --json` in a terminal) and the
+  unfrozen script with no args both keep the original text-to-stdout default. So
+  the new behavior is scoped exactly to the double-click case and the explicit
+  `--report` flag; nothing else changes.
+- **Localized default *filename* only, via a tiny hardcoded language→name map**
+  (`report_name.py`): `en → machine_inventory`, `pt → inventario_de_maquina`,
+  `es → inventario_de_equipo`, `fr → inventaire_machine`, `de → maschineninventar`,
+  English fallback for anything else. The language is detected best-effort and
+  pure-stdlib: Windows `GetUserDefaultUILanguage` → `locale.windows_locale` LCID
+  map, else the POSIX `LC_ALL`/`LANG`/`LANGUAGE` env family, else
+  `locale.getlocale`/`getdefaultlocale`, else `en`. Detection never raises (any
+  failure falls through to English). `-o` overrides the name entirely.
+- **Filename only — report *content* stays English.** Full content i18n
+  (section labels, values) conflicts with the project's "English everywhere"
+  rule and is a genuinely larger effort; it stays parked under ROADMAP Ideas.
+  This ADR translates exactly one string: the default filename.
+**Consequences.** Double-clicking the binary now leaves a viewable artifact and
+opens it, instead of a blink-and-gone console — the single biggest UX gap for a
+non-technical reviewer running the stick. The `sys.frozen`+no-args gate keeps
+the change invisible to the CLI/test surface (the existing 227 tests are
+untouched; 12 new offline tests pin the map, the detection-never-raises
+contract, and the four routing cases: `--report`, frozen-no-args, frozen-with-
+args, unfrozen-no-args). Verified live: the Windows binary double-clicked on this
+pt-BR box wrote **`inventario_de_maquina.html`** (localized) and opened it,
+exit 0. Trade-off: language detection is best-effort and territory-blind (`pt_BR`
+and `pt_PT` both → `pt`), which is fine for a filename.
+
+## ADR-018 — One-file binaries; collectors found via the import graph; unsigned, documented
+
+**Context.** F5's packaging raised three non-obvious choices: **one-file vs
+one-folder** PyInstaller output, **how the frozen app finds its collectors**
+(the self-registration in ADR-002 depends on import side-effects that a static
+bundler might miss), and **code signing**.
+**Decision.**
+- **One-file (`--onefile`-equivalent single `EXE`), not one-folder.** The whole
+  project promise is "drop one thing on a stick and run it anywhere" (the same
+  spirit as ADR-015's zero-external-asset HTML report). A one-folder build is a
+  directory of dozens of DLLs/`.so`s that must travel together; one self-
+  contained executable per OS is the honest match to the pitch. The accepted
+  cost is a **first-run temp-extraction delay** (the bootloader unpacks to a
+  temp dir): measured ~15 s cold (extraction + Defender scanning a fresh unsigned
+  exe) and ~3 s warm on this box. For an inventory tool run occasionally, not a
+  hot path, that trade is right.
+- **Collectors are found by the import graph, reinforced by explicit
+  `hiddenimports`.** ADR-002's self-registration works *because*
+  `collectors/__init__.py` imports each collector module explicitly, so
+  PyInstaller's static analysis follows those edges and bundles all 16. To make
+  that guarantee independent of analysis heuristics, the spec **also** lists the
+  16 modules in `hiddenimports` — belt-and-suspenders. The frozen `--list` is
+  asserted to return 16 both in local verification and in the release workflow's
+  per-OS smoke test, so a dropped collector fails the build rather than shipping
+  silently. Verified live: the Windows binary's `--list` shows all 16.
+- **Ship unsigned, document it.** Code-signing needs a paid certificate
+  (Windows) / an Apple Developer ID; for a free, open-source portfolio tool that
+  cost isn't justified. The binaries are therefore unsigned and SmartScreen /
+  Gatekeeper may warn on first run. This is stated plainly in `build/README.md`
+  rather than hidden — the source and the exact build workflow are in the repo,
+  which is the honest substitute for a signature.
+**Consequences.** A single downloadable file per OS that runs with no Python
+installed (the F5 DoD). The entry point is a thin `build/entrypoint.py` doing an
+absolute `from machine_scanner.cli import main` (a PyInstaller entry runs as
+`__main__`, so the package's relative-import `__main__.py` can't be the target).
+`pyinstaller` is a build-time-only `[build]` extra, never a runtime dep / in
+`requirements.txt` (ADR-001 holds). macOS and Linux binaries are produced by the
+release runners — they can't be built on this Windows box, and WSL here has no
+`pip`; that division of labor is explicit, not hand-waved.

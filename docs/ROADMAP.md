@@ -112,7 +112,7 @@
     tests): self-containment, search/collapse/copy scaffolding, nested tree,
     and diff add/remove/change incl. the no-change (empty) case. 224 total green.
 
-## F5 — Packaged binaries (USB-stick deliverable)
+## F5 — Packaged binaries (USB-stick deliverable)  ✅ (2026-06-12)
 
 - **Objective:** the "plug into anything" story, realistically.
 - **How:** PyInstaller one-file specs in `build/` per OS; a release workflow
@@ -131,8 +131,24 @@
   es/fr/de). So a PT-BR box yields `inventario_de_maquina.html`. **Filename only**
   — report *content* stays English (the "English everywhere" rule + full i18n is
   out of scope; parked under Ideas). No new deps, offline.
-- **DoD:** a downloadable binary per OS that runs with no Python installed; a
+- **DoD:** ✅ a downloadable binary per OS that runs with no Python installed; a
   double-click on the binary produces (and opens) a localized-name HTML report.
+  - **One-file spec** (`build/machine_scanner.spec` + `entrypoint.py`, ADR-018):
+    one spec → one binary per OS, self-named from the build OS; `pyinstaller` a
+    build-time-only `[build]` extra (ADR-001 intact). Built + verified live on
+    Windows: `dist/machine-scanner-windows.exe` (7.4 MB), clean-shell `--list`
+    → all 16 collectors, `--json`/`--html`/`--diff`/`--report` exit 0, 0 external
+    refs in the HTML.
+  - **Frozen double-click UX** (ADR-017): `sys.frozen`+no-args → write+open an
+    HTML report (CLI text default untouched); `--report` for terminals; default
+    filename localized by OS language (`inventario_de_maquina.html` confirmed
+    live on a pt-BR box), content stays English. +12 offline tests (239 total).
+  - **Release workflow** (`release.yml`): tag-triggered `v*`, builds on
+    windows/ubuntu/macos-latest with a per-OS `--list`==16 smoke gate, uploads
+    three artifacts to a GitHub Release. Linux/macOS binaries are produced there
+    (not buildable on the Windows dev box / WSL-no-pip). Stick-layout doc in
+    `build/README.md`. **Remaining:** push a `v0.1.0` tag to mint the cross-OS
+    binaries (polish, not a phase).
 
 ## Ideas parked (not scheduled)
 

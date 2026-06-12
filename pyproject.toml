@@ -22,6 +22,10 @@ dependencies = ["psutil>=5.9"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]
+# Build-time only — PyInstaller freezes the binaries (ROADMAP F5). Kept out of
+# the runtime deps and requirements.txt (ADR-001: psutil is the single runtime
+# dependency); installed by the release workflow and for local builds.
+build = ["pyinstaller>=6"]
 
 [project.scripts]
 machine-scanner = "machine_scanner.cli:main"
