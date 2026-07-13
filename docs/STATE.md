@@ -44,8 +44,10 @@ this pt-BR box wrote `inventario_de_maquina.html`** (localized!) and opened it,
 exit 0. Startup: ~15 s cold (one-file temp-extract + Defender), ~3 s warm.
 **Linux + macOS binaries are NOT buildable here** (no Mac; WSL has no `pip`) —
 they are produced by the release workflow's runners on a `v*` tag. **239 tests
-green** (was 227 pre-F5; +12 F5 tests). CI untouched (no new runtime dep; all
-new tests offline).
+green at the time of F5** (was 227 pre-F5; +12 F5 tests). CI untouched (no new
+runtime dep; all new tests offline). *(Superseded: the count is now **240** —
+see the brand-assets entry below, which added one test. Verified by
+`pytest --collect-only`: 240 collected, 240 passed.)*
 
 ## Prior phase (F4) — reference
 
@@ -175,7 +177,7 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
 ## Post-F5 polish (2026-06-12) — brand + release
 
 - **Brand assets landed** (from the better source logos in
-  `(private career repo)`, processed with Pillow — crop to the bright cyan
+  a private asset folder, processed with Pillow — crop to the bright cyan
   inner cube, contrast/saturation boost, **bolded for the small sizes so the
   mark survives at 16 px**): `build/machine_scanner.ico` (multi-res 16–256,
   auto-embedded by the spec, rebuilt + confirmed in the Windows exe),
