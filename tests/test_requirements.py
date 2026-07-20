@@ -328,3 +328,61 @@ def test_importing_a_collector_does_not_drag_in_the_others():
     assert "collectors.cpu" in out  # the import under test actually happened
     for excluded in ("network", "usb", "storage_devices", "bluetooth"):
         assert excluded not in out
+
+
+# --------------------------------------------------------------------------- #
+# found on a real Windows 8 GB machine, 2026-07-20
+# --------------------------------------------------------------------------- #
+
+def test_an_8gb_machine_clears_the_8gb_bar():
+    """Reported RAM is always under the sticker size, so 7.9 GB IS an 8 GB box.
+
+    The original bars rejected exactly the machines they were written to admit.
+    """
+    checks = _checks(_inv(memory=7.9, disk=46.0, cpu=4))
+    ram = next(c for c in checks if c.key == "ram")
+    assert ram.meets("minimum")
+    assert "8 GB" in ram.actual_text
+    assert "7.9" in ram.detail  # the reported figure is still disclosed
+
+
+def test_a_16gb_laptop_with_an_igpu_clears_the_16gb_bar():
+    # An iGPU can reserve ~9% of system RAM; 14.57 GB is a 16 GB machine.
+    checks = _checks(_inv(memory=14.57, disk=500.0, cpu=16))
+    assert next(c for c in checks if c.key == "ram").meets("recommended")
+
+
+def test_an_unusual_size_is_not_rounded_up_to_memory_it_lacks():
+    checks = _checks(_inv(memory=6.32, disk=500.0, cpu=4))
+    ram = next(c for c in checks if c.key == "ram")
+    assert ram.actual == 6.32
+    assert not ram.meets("minimum")
+
+
+def test_the_windows_8gb_box_reads_yes_with_limits_not_no():
+    igpu = {"vendor": "Intel", "name": "Intel(R) HD Graphics", "memory_total_mb": 1024}
+    text = to_requirements_text(_inv(memory=7.9, gpus=[igpu], disk=46.0, cpu=4))
+    assert "YES, WITH LIMITS" in text
+    assert ">> NO" not in text
+
+
+def test_a_memory_blocker_never_claims_the_machine_has_the_memory():
+    """The sentence contradicted the table two lines above it."""
+    text = to_requirements_text(_inv(memory=3.0, disk=500.0, cpu=4))
+    assert "has the memory for a model" not in text
+    assert "Short of the minimum on" in text
+
+
+def test_a_disk_only_blocker_still_says_memory_is_not_the_problem():
+    text = to_requirements_text(
+        _inv(memory=32.0, disk=6.0, cpu=8, ollama=False, docker=False)
+    )
+    assert "has the memory for a model" in text
+
+
+def test_html_output_is_pure_ascii():
+    """A page that travels by email/chat must not depend on charset handling."""
+    igpu = {"vendor": "Intel", "name": "Intel(R) HD Gráficos —", "memory_total_mb": 1024}
+    html = to_requirements_html(_inv(memory=7.9, gpus=[igpu], disk=46.0, cpu=4))
+    html.encode("ascii")  # raises if any non-ASCII byte survives
+    assert "&#" in html  # ...because the non-ASCII became entities, not because it vanished

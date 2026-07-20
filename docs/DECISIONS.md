@@ -705,6 +705,36 @@ answered separately, by the model-range line.
    the machine would run once the space exists. Collapsing the two loses a
    customer who would qualify by the end of the conversation.
 
+### Amendment (2026-07-20) — three corrections from the first real Windows run
+
+A live 8 GB Windows box read **`NO`**. It should have read `YES, WITH LIMITS`.
+
+1. **A bar in sticker gigabytes cannot be compared against reported gigabytes.**
+   A machine never reports the size it was sold as — firmware, integrated
+   graphics and reserved regions take a slice first. That box reported **7.9 GB**
+   against an **8 GB** minimum; a 16 GB laptop with an Intel iGPU reports as
+   little as **14.6** against a 16 GB recommendation. **The bars were rejecting
+   exactly the machines they were written to admit.** Fixed with
+   `catalog.nominal_ram_gb`, which rounds up to the nearest standard size only
+   when the reported figure is within 12% of it — so an unusual configuration is
+   never credited with memory it does not have. The reported number stays visible
+   in the detail line; only the *comparison* uses the nominal size. **The `fit`
+   calculation still uses the reported figure**, because a model runs in real
+   memory, not sticker memory.
+2. **The conditional sentence contradicted the table.** Under a `NO` the report
+   said *"It has the memory for a model — that is not what is blocking it"* two
+   lines below a table stating that memory was, in fact, what was blocking it.
+   That line was written for the disk case and hardcoded for all of them. It is
+   now only emitted when every blocker is soft.
+3. **The HTML is pure ASCII.** Non-ASCII characters are emitted as numeric
+   entities. This page travels by email, chat upload and USB stick, through tools
+   that do not all honour `<meta charset>` — and an em dash read as cp1252 turns
+   into `â` (ADR-016's failure mode, in a file this repo hands to strangers). A
+   pure-ASCII file cannot be mis-decoded by anything.
+
+**None of these were reachable from a synthetic test that I wrote knowing the
+thresholds.** All three needed someone else's actual machine.
+
 **Corollary — a failing machine never gets a recommendation.** "Best available
 to you: llama3.1:8b" printed under a `NO` reads as a contradiction. Below the
 bar, the phrasing goes conditional: what it *would* run once the blockers clear.

@@ -23,7 +23,7 @@ from typing import Optional
 
 from ..collectors.llm_runtime import install_size_gb
 from ..core.models import Inventory
-from .catalog import REQUIREMENTS
+from .catalog import REQUIREMENTS, nominal_ram_gb
 from .fit import FitProfile
 
 TIERS = ("minimum", "recommended")
@@ -141,12 +141,26 @@ def evaluate(inventory: Inventory, profile: FitProfile) -> tuple[list[Check], li
     )
 
     # --- system RAM ---------------------------------------------------------
+    # The BAR is checked against the size the machine was sold as, not the
+    # figure it reports: an 8 GB box reports ~7.9 and would otherwise fail an
+    # 8 GB minimum. (The *fit* calculation in `fit.py` keeps using the reported
+    # number — a model runs in real memory, not sticker memory.)
     ram = profile.ram_total_gb
+    if ram is None:
+        ram_text, ram_detail, ram_value = "could not be read", "", None
+    else:
+        ram_value = nominal_ram_gb(ram)
+        ram_text = f"{ram_value:g} GB"
+        ram_detail = (
+            f"reports {ram:.1f} GB — firmware and integrated graphics reserve the rest"
+            if ram_value != ram
+            else ""
+        )
     checks.append(
         Check(
-            "ram", ram_req.label, ram,
-            f"{ram:.1f} GB" if ram is not None else "could not be read",
+            "ram", ram_req.label, ram_value, ram_text,
             ram_req.minimum, ram_req.recommended, ram_req.unit,
+            detail=ram_detail,
         )
     )
 

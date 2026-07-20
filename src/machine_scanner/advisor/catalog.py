@@ -102,6 +102,34 @@ class Requirement:
         return f"{value:g} {self.unit}".strip()
 
 
+# RAM is sold in standard sizes, and a machine NEVER reports its sticker figure:
+# firmware, integrated graphics and reserved regions take a slice first. An 8 GB
+# box reports ~7.9, and a 16 GB box with an Intel iGPU can report ~14.6. Comparing
+# the reported number against a bar of 8 or 16 therefore rejects exactly the
+# machines the bar was written to admit — found on a real Windows 8 GB box
+# (2026-07-20), which read NO when it should have read YES, WITH LIMITS.
+_STANDARD_RAM_GB = (2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256)
+
+# How far below its sticker size a machine may report and still be credited with
+# it. 12% covers the worst case seen (a 16 GB laptop reserving ~9% for its iGPU)
+# without reaching the next size down.
+_RAM_REPORTING_SLACK = 0.88
+
+
+def nominal_ram_gb(reported: float) -> float:
+    """The size this machine was sold as, inferred from what it reports.
+
+    Rounds up to the nearest standard size only when the reported figure is
+    close enough to be that size minus its reserved slice; otherwise the
+    reported number is returned unchanged, so an unusual configuration is never
+    credited with memory it does not have.
+    """
+    for size in _STANDARD_RAM_GB:
+        if size * _RAM_REPORTING_SLACK <= reported <= size:
+            return float(size)
+    return reported
+
+
 # Memory is expressed two ways because the same model needs different amounts
 # depending on where it runs: system RAM is shared with the OS (hence the 80%
 # rule), dedicated VRAM is not.

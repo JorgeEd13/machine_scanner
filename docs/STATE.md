@@ -34,6 +34,24 @@ for someone who was *sent* it and has no reason to trust it yet.
   to `collectors/_all.py` (the package now imports nothing), plus
   `run_all(autoload=False)`. Importing one collector no longer imports all 17.
 
+### ⚠️ Three bugs found by the first real Windows run (2026-07-20) — all fixed
+A live **8 GB Windows box read `NO`**; it should have read `YES, WITH LIMITS`.
+1. **RAM bars compared sticker GB against reported GB.** A machine never reports
+   the size it was sold as: that box reported **7.9** against an **8 GB** bar, and
+   a 16 GB laptop with an iGPU reports **14.6** against 16. The bars rejected the
+   machines they were written to admit. Fixed by `nominal_ram_gb` (round up to a
+   standard size only within 12%); the reported figure stays visible, and `fit`
+   still sizes on real memory.
+2. **The range line contradicted the table** — "It has the memory for a model"
+   printed under a memory blocker. Now emitted only when all blockers are soft.
+3. **HTML is now pure ASCII** (numeric entities). The page travels by email and
+   chat through tools that ignore `<meta charset>`; an em dash read as cp1252
+   becomes `â` — ADR-016's failure mode, in the one file we hand to strangers.
+
+**307 tests green** (was 300; +7 regression tests, each named for the machine
+that found it). **None of these were reachable from tests written by the person
+who chose the thresholds** — they needed someone else's real hardware.
+
 ### Verified (F6.1, Linux live — both binaries built)
 Qualifier **9.4 MB**; `strings` confirms **none** of the twelve excluded
 collectors are in it. Full scanner still lists **17**. The delivered HTML page

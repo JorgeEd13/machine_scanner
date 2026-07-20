@@ -83,11 +83,19 @@ def _range_lines(ctx: dict) -> List[str]:
 
     lo, hi = fitting[0], fitting[-1]
     if ctx["verdict"] in (_NO, _NOT_YET):
-        blocked = ", ".join(c.label.lower() for c in ctx["blockers"])
+        blocked = ", ".join(c.label for c in ctx["blockers"])
+        # "It has the memory for a model" is only true when memory is NOT the
+        # blocker. Said under a memory blocker it directly contradicts the table
+        # two lines above — seen on a real 8 GB Windows box, 2026-07-20.
+        if all(c.key in _SOFT_BLOCKERS for c in ctx["blockers"]):
+            return [
+                f"Once the {blocked} requirement is met, this machine would run "
+                f"{hi['name']}.",
+                "It has the memory for a model — that is not what is blocking it.",
+            ]
         return [
-            f"Once the {blocked} requirement is met, this machine would run "
-            f"{hi['name']}.",
-            "It has the memory for a model — that is not what is blocking it.",
+            f"Short of the minimum on: {blocked}.",
+            "Meeting it would bring a small model within reach of this machine.",
         ]
 
     if lo["name"] == hi["name"]:
@@ -240,19 +248,31 @@ td.num,th.num{text-align:right;white-space:nowrap}
 """
 
 
+def _ascii(text: str) -> str:
+    """Escape for HTML, then render every non-ASCII character as an entity.
+
+    The page travels by email, chat upload and USB stick, through tools that do
+    not all honour `<meta charset>`. A pure-ASCII file cannot be mis-decoded:
+    an em dash becomes `&#8212;` rather than a byte sequence something downstream
+    may read as cp1252 and turn into `â`. This repo has been bitten by exactly
+    that class of bug before (ADR-016).
+    """
+    return html.escape(text).encode("ascii", "xmlcharrefreplace").decode("ascii")
+
+
 def _row(check: Check) -> str:
     def cell(ok: bool, text: str) -> str:
         cls = "pass" if ok else "fail"
         mark = "&#10003;" if ok else "&#10007;"
-        return f"<td class='num {cls}'>{mark} {html.escape(text)}</td>"
+        return f"<td class='num {cls}'>{mark} {_ascii(text)}</td>"
 
     detail = (
-        f"<span class='detail'>{html.escape(check.detail)}</span>" if check.detail else ""
+        f"<span class='detail'>{_ascii(check.detail)}</span>" if check.detail else ""
     )
     return (
         "<tr>"
-        f"<td><strong>{html.escape(check.label)}</strong></td>"
-        f"<td>{html.escape(check.actual_text)}{detail}</td>"
+        f"<td><strong>{_ascii(check.label)}</strong></td>"
+        f"<td>{_ascii(check.actual_text)}{detail}</td>"
         f"{cell(check.meets('minimum'), check.target_text('minimum'))}"
         f"{cell(check.meets('recommended'), check.target_text('recommended'))}"
         "</tr>"
@@ -265,20 +285,20 @@ def to_requirements_html(inventory: Inventory) -> str:
 
     rows = "".join(_row(c) for c in ctx["checks"])
 
-    range_html = "<br>".join(html.escape(line) for line in _range_lines(ctx))
+    range_html = "<br>".join(_ascii(line) for line in _range_lines(ctx))
 
     blockers = ""
     if ctx["blockers"]:
         items = "".join(
-            f"<li><strong>{html.escape(c.label)}</strong> &mdash; has "
-            f"{html.escape(c.actual_text)}, needs {html.escape(c.target_text('minimum'))}</li>"
+            f"<li><strong>{_ascii(c.label)}</strong> &mdash; has "
+            f"{_ascii(c.actual_text)}, needs {_ascii(c.target_text('minimum'))}</li>"
             for c in ctx["blockers"]
         )
         blockers = f"<div class='blockers'>Below the minimum:<ul>{items}</ul></div>"
 
     notes = ""
     if ctx["notes"]:
-        items = "".join(f"<li>{html.escape(n)}</li>" for n in ctx["notes"])
+        items = "".join(f"<li>{_ascii(n)}</li>" for n in ctx["notes"])
         notes = f"<ul class='notes'>{items}</ul>"
 
     return (
@@ -289,16 +309,16 @@ def to_requirements_html(inventory: Inventory) -> str:
         "<div class='band'>"
         f"<img alt='' width='36' height='36' src='data:image/png;base64,{MARK_B64}'>"
         "<div><h1>Local AI model requirements</h1>"
-        f"<div class='os'>{html.escape(ctx['os'])}</div></div></div>"
+        f"<div class='os'>{_ascii(ctx['os'])}</div></div></div>"
         "<div class='body'>"
         f"<p class='verdict' style='color:{color}'>{ctx['verdict']}</p>"
-        f"<p class='summary'>{html.escape(ctx['summary'])}</p>"
+        f"<p class='summary'>{_ascii(ctx['summary'])}</p>"
         "<table><thead><tr><th>Component</th><th>This machine</th>"
         "<th class='num'>Minimum</th><th class='num'>Recommended</th></tr></thead>"
         f"<tbody>{rows}</tbody></table>"
         f"<div class='range'>{range_html}</div>"
         f"{blockers}{notes}"
-        f"<div class='scope'><p>{html.escape(SCOPE_STATEMENT)}</p>"
-        f"<p>{html.escape(READONLY_STATEMENT)}</p></div>"
+        f"<div class='scope'><p>{_ascii(SCOPE_STATEMENT)}</p>"
+        f"<p>{_ascii(READONLY_STATEMENT)}</p></div>"
         "</div></div></body></html>"
     )
