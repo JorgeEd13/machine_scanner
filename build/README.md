@@ -26,7 +26,8 @@ the release workflow, never committed.
 
 ```sh
 python -m pip install -e ".[build]"      # pyinstaller, build-time only
-pyinstaller build/machine_scanner.spec   # -> dist/machine-scanner-<os>[.exe]
+pyinstaller build/machine_scanner.spec           # -> dist/machine-scanner-<os>[.exe]
+pyinstaller build/ai_model_requirements.spec    # -> dist/ai-model-requirements-<os>[.exe]
 ```
 
 `pyinstaller` is a **build-time** dependency only (a `[build]` extra), never a
@@ -37,7 +38,8 @@ dependency (ADR-001).
 
 Push a `v*` tag. [`.github/workflows/release.yml`](../.github/workflows/release.yml)
 builds the binary on `windows-latest`, `ubuntu-latest` and `macos-latest`,
-smoke-tests each (`--list` must show all 16 collectors), and uploads the three
+smoke-tests each (`--list` must show all 17 collectors, and the qualifier must
+print a verdict), and uploads the six
 to a GitHub Release. macOS and Linux binaries come from those runners — they
 can't be built on a Windows dev box (and WSL here has no `pip`).
 
@@ -45,7 +47,7 @@ can't be built on a Windows dev box (and WSL here has no `pip`).
 
 ## USB-stick layout — "plug into anything"
 
-Drop the three binaries on a stick. On any machine, run the one for its OS — no
+Drop the binaries on a stick. On any machine, run the one for its OS — no
 Python, no install, no network:
 
 ```
@@ -53,6 +55,9 @@ machine-scanner/
 ├─ machine-scanner-windows.exe     ← Windows: double-click or run in a terminal
 ├─ machine-scanner-linux           ← Linux:  chmod +x once, then ./machine-scanner-linux
 ├─ machine-scanner-macos           ← macOS:  chmod +x once, then ./machine-scanner-macos
+├─ ai-model-requirements-windows.exe  ← the scoped "can this run a local AI model?"
+├─ ai-model-requirements-linux           check: 5 collectors, no identifying data,
+├─ ai-model-requirements-macos           one-page verdict (ADR-021)
 └─ src/  (optional)                ← the Python fallback: `python -m machine_scanner`
 ```
 
