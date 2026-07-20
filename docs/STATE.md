@@ -289,12 +289,25 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
 
 ## Next step
 
-- **Cut `v0.2.0`** — F6/F6.1 added a user-visible capability (`--ollama`, a new
-  section in every report) and a **second binary**, so the next release is a
-  minor bump, not `v0.1.0`. Validate-then-tag as below; the release now ships
-  **six** artifacts (3 scanner + 3 qualifier) and the smoke test asserts 17
-  collectors plus a qualifier verdict on each OS.
-- **Cut `v0.1.0`** (validate-then-tag): run `release.yml` via `workflow_dispatch`
+- ✅ **`v0.2.0` PUBLISHED (2026-07-20)** — six artifacts (3 scanner + 3
+  qualifier), built from the commit that carries all three Windows fixes.
+  Verified live on a real Windows box afterwards: the 8 GB machine now reads
+  `YES, WITH LIMITS`, the RAM row shows `8 GB` with `reports 7.9 GB` beneath it,
+  and the em dash arrives as `&#8212;` and renders correctly in the browser.
+- **macOS is still unverified by a human.** The binary builds and passes its
+  smoke test on the `macos-latest` runner, but nobody has double-clicked it.
+  **Docker cannot help** — a container shares the host kernel and a Mach-O
+  binary needs XNU plus Apple's frameworks; virtualising macOS off Apple
+  hardware breaches the licence. **The runner IS real Apple hardware**, so the
+  cheap next step is to extend its smoke test: run the default HTML path, then
+  `xattr -w com.apple.quarantine` + `spctl --assess --type execute -vv` to
+  capture **what Gatekeeper actually says**, so client instructions can quote it
+  instead of guessing. The Finder double-click stays untestable (no GUI session).
+- **Keep feeding it real machines.** Every bug in the F6.1 round came from
+  someone else's hardware; none were reachable from fixtures written by whoever
+  chose the thresholds. A box with a discrete AMD GPU, or one with 4 GB of RAM,
+  would be the next most informative.
+- ~~**Cut `v0.1.0`** (validate-then-tag)~~ — superseded by v0.2.0: run `release.yml` via `workflow_dispatch`
   first to confirm the 3-OS build (no public artifact), then push the tag to mint
   the GitHub Release with `machine-scanner-{windows.exe,linux,macos}`. The
   Windows binary is verified locally; the Linux/macOS ones come from the runners.
