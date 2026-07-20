@@ -52,6 +52,10 @@ a = Analysis(
     # collectors/__init__ (ADR-002), so PyInstaller's import-graph analysis
     # already pulls them in. Listing them here too is belt-and-suspenders: it
     # guarantees the frozen --list shows all 16 even if analysis ever changes.
+    #
+    # `advisor/` deliberately needs no entry: cli.py imports it directly, so the
+    # normal import graph reaches it. Only the registry's *indirect* discovery
+    # needs the safety net.
     hiddenimports=[
         "machine_scanner.collectors.system",
         "machine_scanner.collectors.cpu",

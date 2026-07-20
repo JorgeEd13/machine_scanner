@@ -2,14 +2,46 @@
 
 > Volatile, short. Update at the end of each step.
 
-**Date:** 2026-06-12
-**Phase:** F5 (packaged PyInstaller binaries per OS — the USB-stick deliverable)
-— ✅ **closed**. The **last numbered phase**; all of F0–F5 are now done. ADR-017
-(frozen no-args report mode + localized filename) and ADR-018 (one-file /
-collector discovery / unsigned) for the choices. Next session = polish/showcase
-(README hero image, demo GIF, logo refinement), **not** a numbered phase.
+**Date:** 2026-07-20
+**Phase:** F6 (local-LLM fit advisor) — ✅ **closed**. F0–F6 all done.
+ADR-019 (advisor is a derived layer, not a collector) and ADR-020 (the catalog
+port from `receivables-agent` is not a clean-room breach) for the choices.
 
-## Current focus (F5) — done
+## Current focus (F6) — done
+
+A new pure layer, `src/machine_scanner/advisor/`, answers *"which local LLM can
+this machine run?"* from a completed scan:
+
+- **`catalog.py`** — 9 public Ollama chat models × {RAM, VRAM, download size,
+  coarse quality rank}, plus the capability bands
+  (`unusable` / `minimal` / `workable` / `comfortable`).
+- **`fit.py`** — pure `Inventory → Section`. Usable memory = **VRAM** where a
+  *discrete* GPU can accelerate, else **80% of system RAM**. Ranks the catalog
+  against memory **and free disk**.
+- **`summary.py`** — the short pasteable verdict (`--ollama`), display-only.
+- **CLI** — `ollama_fit` rides along with every full scan (and the double-click
+  HTML report); `--only` filters it like a collector; `--ollama` prints just the
+  verdict.
+
+**Why not a 17th collector (ADR-019):** a collector is zero-arg and cannot see
+its siblings, but this question spans cpu + memory + gpu + disk at once — a
+collector could only answer it by re-detecting all four, duplicating the most
+OS-specific code in the repo. Deriving instead of probing also makes every
+branch testable from a synthetic `Inventory`.
+
+**Three traps the naive heuristic falls into**, all handled and all tested:
+integrated GPUs counted as VRAM (double-counts system RAM); Windows
+`AdapterRAM` saturating at 4 GB (a 16 GB card reads as 4 — degrades
+conservatively, with a note); disk blocking a model that memory allows.
+
+### Verified (F6, Linux live)
+Hybrid-GPU laptop (Intel Raptor Lake iGPU + **RTX 4050**): the iGPU is correctly
+**excluded**, the box is sized on the 4050's **6.0 GB VRAM** → verdict
+`comfortable`, best fit `qwen2.5:7b`, 5 of 9 models fitting. HTML report still
+**0 external refs**; `--only memory` correctly omits the section. **269 tests
+green** (was 240; +29 offline).
+
+## Prior phase (F5) — reference
 
 Three deliverables, all landed this session:
 
@@ -192,6 +224,9 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
 
 ## Next step
 
+- **Cut `v0.2.0`** — F6 added a user-visible capability (`--ollama`, a new
+  section in every report), so the next release is a minor bump, not `v0.1.0`.
+  Validate-then-tag as below.
 - **Cut `v0.1.0`** (validate-then-tag): run `release.yml` via `workflow_dispatch`
   first to confirm the 3-OS build (no public artifact), then push the tag to mint
   the GitHub Release with `machine-scanner-{windows.exe,linux,macos}`. The

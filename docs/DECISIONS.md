@@ -519,3 +519,86 @@ absolute `from machine_scanner.cli import main` (a PyInstaller entry runs as
 `requirements.txt` (ADR-001 holds). macOS and Linux binaries are produced by the
 release runners — they can't be built on this Windows box, and WSL here has no
 `pip`; that division of labor is explicit, not hand-waved.
+
+---
+
+## ADR-019 — Model fit is an **advisor**, not a collector: derived from the scan, never re-probed
+
+**Date:** 2026-07-20 · **Status:** accepted
+
+**Context.** The tool needed to answer "which local LLM can this machine run?"
+— the natural next question after "what is this machine?", and already implied
+by the README's *"sizing a machine for a workload"* framing.
+
+The obvious implementation is a 17th collector. It is the wrong one.
+
+**The problem with a collector.** A collector is a **zero-arg callable that
+cannot see its siblings** (`core/registry.py`) — that isolation is what keeps a
+flaky probe from costing you the rest of the scan. But model selection is a
+question about **CPU, memory, GPU and disk at once**. A collector could only
+answer it by **re-detecting all four itself**, which means a second, divergent
+copy of the detection logic living beside the one that already works — and the
+GPU probe in particular is the most OS-specific code in the repo (ADR-010).
+
+**Decision.** A new layer, `advisor/`: pure functions that take a completed
+`Inventory` and return a derived `Section`. It probes nothing. `cli.py` appends
+it after `run_all()`, the way it already wires registry → renderer.
+
+**Why this is the same split the repo already makes.** `report/diff.py` computes
+over saved scans and its formatters display without recomputing (ADR-015). The
+advisor is that boundary applied one step earlier: **collect once, derive many
+times.** Layering stays acyclic — `advisor/` depends on `core.models` only,
+never on collectors, never on `report`.
+
+**Consequences.**
+- **Tests are hardware-agnostic by construction.** Every branch of the heuristic
+  is reachable from a synthetic `Inventory` dict — including hardware nobody
+  here owns (a 70B-capable workstation, a saturated Windows VRAM reading).
+- **`--only` needs a rule.** The advisor is not in `--list` (it is not a
+  collector) but `--only ollama_fit` works and `--only cpu` correctly omits it.
+- **It is only as good as the scan.** A section it needs being `UNAVAILABLE`
+  makes the advice `UNAVAILABLE` too, with the reason. It never guesses.
+
+**Rejected — probing Ollama itself.** Asking `/api/tags` which models are
+already pulled would sharpen the recommendation. But the question this answers
+is asked *before* anything is installed, on a machine where Ollama's absence is
+the normal case. Adding a network call would make a pure function impure to
+improve an answer for users who need it least. A future readiness check — "is
+the prerequisite actually installed and working" — is a **different question at
+a different moment**, and belongs in its own mode.
+
+---
+
+## ADR-020 — The catalog is ported from `receivables-agent`, and that is not a clean-room breach
+
+**Date:** 2026-07-20 · **Status:** accepted
+
+**Context.** Golden rule 2 of `CLAUDE.md` says clean room, and names a **private**
+`hardware.py` as explicitly not a source to copy from. The model catalog and the
+effective-memory heuristic in `advisor/` come from a `hardware.py` — the one in
+`receivables-agent`.
+
+**Decision.** The port is allowed and recorded here so a future session does not
+read it as a violation and "fix" it.
+
+**Why they are different cases.** The rule protects against carrying in code or
+data from **private, third-party-owned** work. `receivables-agent` is the same
+author's **public, MIT-licensed** repo. There is nothing confidential in a list
+of public Ollama tags and a "reserve 20% of RAM" rule of thumb.
+
+**What was actually reused, honestly.** The *catalog numbers* and the
+*effective-memory idea*. Nothing else survived the move, because the two tools
+run at opposite moments:
+
+| | `receivables-agent` `hardware.py` | `advisor/` |
+|---|---|---|
+| runs | inside the app, at construction | standalone, before anything is installed |
+| detection | its own psutil/`nvidia-smi` probes | none — reads a completed scan |
+| GPU vendors | NVIDIA only | whatever the `gpu` collector enumerated |
+| integrated GPUs | not considered | excluded, or the sizing double-counts RAM |
+| disk | ignored | part of the verdict |
+| output | an `OLLAMA_MODEL=` line for a container | a verdict a person reads |
+
+**The rule this leaves behind.** Reuse of one's own public engineering is fine
+and should be recorded, not hidden. Carrying content out of private or
+client-owned work is the thing the rule exists to stop, and it is untouched.

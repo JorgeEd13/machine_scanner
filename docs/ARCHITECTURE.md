@@ -16,6 +16,11 @@ collectors/                 core/                         report/
                                               cli.py  (text/--json/--html/--diff)
 ```
 
+`advisor/` is the F6 addition and sits between the two: pure functions that take
+a **completed** `Inventory` and derive a new `Section` from several existing ones
+at once (`ollama_fit` — which local LLM this machine can run). It probes nothing,
+so it is not a collector; `cli.py` appends it after `run_all()`. See ADR-019.
+
 `report/diff.py` is the F4 addition: a **pure** comparison of two saved
 `Inventory.to_dict()` scans (`diff_scans`) plus separate text/HTML formatters
 that display the diff and never recompute it — the same "compute vs render"
@@ -67,10 +72,12 @@ rather than crashing.
 
 - `core/` — no knowledge of specific collectors or output formats.
 - `collectors/` — depend on `core`; never on `report` or `cli`.
+- `advisor/` — depends on `core.models` only; never imports collectors or
+  `report`. Derives new sections from a finished `Inventory` (ADR-019).
 - `report/` — depend on `core.models` only; never import collectors. The diff
   (`report/diff.py`) computes over plain `to_dict()` dicts and is renderer-
   agnostic; its text/HTML formatters display but never compute.
-- `cli.py` — wires registry → renderer; the only place that knows all three.
+- `cli.py` — wires registry → advisor → renderer; the only place that knows all.
 
 Dependencies point inward toward `core`; nothing in `core` imports outward.
 

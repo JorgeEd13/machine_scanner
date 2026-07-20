@@ -130,3 +130,35 @@ def test_non_frozen_no_args_stays_text(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "CPU" in out
     assert "<!doctype html>" not in out  # text, not the report-mode HTML
+
+
+# --------------------------------------------------------------------------- #
+# advisor wiring (ROADMAP F1) — the fit section rides along with a normal scan
+# --------------------------------------------------------------------------- #
+
+_MEMORY = Section("memory", "Memory", Status.OK, {"total_gb": 16.0})
+
+
+def test_scan_includes_the_fit_section(monkeypatch, capsys):
+    _stub_scan(monkeypatch, _MEMORY)
+    cli.main(["--json"])
+    assert '"ollama_fit"' in capsys.readouterr().out
+
+
+def test_only_filter_excludes_the_fit_section(monkeypatch, capsys):
+    _stub_scan(monkeypatch, _MEMORY)
+    cli.main(["--only", "memory", "--json"])
+    assert "ollama_fit" not in capsys.readouterr().out
+
+
+def test_ollama_flag_prints_just_the_verdict(monkeypatch, capsys):
+    _stub_scan(monkeypatch, _MEMORY)
+    assert cli.main(["--ollama"]) == cli.EXIT_OK
+    out = capsys.readouterr().out
+    assert "Verdict" in out
+    assert "Memory" not in out.split("Verdict")[0]  # the full scan is not dumped
+
+
+def test_ollama_flag_still_reports_a_collector_bug(monkeypatch, capsys):
+    _stub_scan(monkeypatch, _MEMORY, Section("boom", "BOOM", Status.ERROR, notes=["kaboom"]))
+    assert cli.main(["--ollama"]) == cli.EXIT_COLLECTOR_ERROR

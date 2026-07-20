@@ -6,6 +6,7 @@
     machine-scanner --only cpu,memory,network
     machine-scanner --list          # list available collectors
     machine-scanner --report        # write + open an HTML report (one-shot)
+    machine-scanner --ollama        # just the local-LLM fit verdict, pasteable
     machine-scanner --diff old.json new.json        # text diff of two scans
     machine-scanner --diff old.json new.json --html -o diff.html
 
@@ -23,6 +24,8 @@ import webbrowser
 from pathlib import Path
 
 from . import __version__
+from .advisor import append_to as append_fit
+from .advisor import to_summary
 from .core.models import Status
 from .core.registry import available, run_all
 from .report import diff_scans, diff_to_html, diff_to_text, to_html, to_json, to_text
@@ -60,6 +63,12 @@ def build_parser() -> argparse.ArgumentParser:
         "(also the default when the packaged binary is double-clicked)",
     )
     parser.add_argument(
+        "--ollama",
+        action="store_true",
+        help="print only the local-LLM fit verdict (which Ollama model this "
+        "machine can run), short enough to paste into a message",
+    )
+    parser.add_argument(
         "--diff",
         nargs=2,
         metavar=("OLD.json", "NEW.json"),
@@ -95,7 +104,7 @@ def _run_report(out: str | None) -> int:
     the OS UI language (filename only — content stays English); ``-o`` overrides
     it. Opening the browser is best-effort and never fails the run.
     """
-    inventory = run_all()
+    inventory = append_fit(run_all())
     path = Path(out) if out else Path(report_filename())
     path.write_text(to_html(inventory), encoding="utf-8")
     print(f"wrote {path}", file=sys.stderr)
@@ -148,9 +157,13 @@ def main(argv: list[str] | None = None) -> int:
         return _run_diff(args.diff, args.html, args.json, args.out)
 
     only = [s.strip() for s in args.only.split(",")] if args.only else None
-    inventory = run_all(only=only)
+    # The advisor derives its answer from the sections above it, so it is
+    # appended after the scan rather than registered as a collector (ADR-019).
+    inventory = append_fit(run_all(only=only), only=only)
 
-    if args.json:
+    if args.ollama:
+        rendered = to_summary(inventory)
+    elif args.json:
         rendered = to_json(inventory)
     elif args.html:
         rendered = to_html(inventory)

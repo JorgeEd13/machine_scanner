@@ -100,6 +100,7 @@ machine-scanner --html -o report.html   # interactive, self-contained HTML
 machine-scanner --report             # write an HTML report and open it (one-shot)
 machine-scanner --only cpu,memory,network
 machine-scanner --list               # list available collectors
+machine-scanner --ollama             # just: which local LLM can this box run?
 
 # Diff two previously saved JSON scans ("what changed on this machine"):
 machine-scanner --json -o monday.json
@@ -116,6 +117,38 @@ copy-as-JSON** (per section or the whole scan). With JavaScript disabled it
 still renders as a readable static page (collapse falls back to native
 `<details>`). The `--diff` mode loads two saved JSON scans (it never re-scans)
 and reports sections added/removed and field-level changes.
+
+### Sizing a machine for a local LLM
+
+Every full scan also carries a **`Local LLM Fit`** section: given the hardware it
+just found, which [Ollama](https://ollama.com) model this machine can actually
+run. `--ollama` prints only that, short enough to paste into a message:
+
+```
+$ machine-scanner --ollama
+Local LLM hardware check
+----------------------------------------------------
+machine : jorge-Nitro-ANV15-52
+os      : Linux-7.0.0-28-generic-x86_64-with-glibc2.43
+
+Verdict : COMFORTABLE
+          Runs a good-quality local model comfortably.
+
+Best fit: qwen2.5:7b
+Memory  : 6.0 GB usable (GPU VRAM)
+GPU     : NVIDIA GeForce RTX 4050 Laptop GPU
+Disk    : 267 GB free
+CPU     : 16 logical cores
+```
+
+Usable memory is **VRAM** where a discrete GPU can accelerate inference, else
+**80% of system RAM** — the headroom the OS and the model process need. Three
+details it gets right that a RAM-only rule of thumb does not: an **integrated
+GPU is excluded** (it borrows the same system RAM, so counting it double-counts
+gigabytes and recommends a model that will not load); a **Windows `AdapterRAM`
+reading** is flagged where it may have saturated at its 4 GB ceiling; and **free
+disk** can veto a model that memory alone would allow. Nothing is installed or
+contacted — it reads the scan it already has.
 
 Some details (BIOS/board serials, full disk SMART, deeper network) require
 admin/root; the report states whether the scan ran `elevated` so missing fields
@@ -141,6 +174,7 @@ are explainable rather than silent.
 | `audio`       | ✅ | sound devices — Windows `Win32_SoundDevice`, Linux `/proc/asound`, macOS `SPAudio` |
 | `bluetooth`   | ✅ | radio/adapters **and** paired devices as separate levels — Windows CIM (`PNPClass='Bluetooth'`), Linux `bluetoothctl`+`/sys/class/bluetooth`, macOS `SPBluetooth` |
 | `printers`    | ✅ | print queues — Windows `Win32_Printer`, Linux `lpstat` (CUPS), macOS `SPPrinters` |
+| `ollama_fit`  | ✅ | *derived, not probed* — which local LLM this machine can run (see below) |
 
 Output formats: **text** (default), **JSON** (`--json`), **interactive HTML**
 (`--html`), plus a **scan diff** (`--diff OLD.json NEW.json`, rendered as text /
@@ -162,6 +196,12 @@ sources (PowerShell CIM / `nvidia-smi` / `lspci` / `lsusb` / `/sys/class/dmi` /
 `system_profiler`) fill the gaps the portable layer can't reach. The tool
 degrades gracefully if `psutil` is absent.
 
+**Advisors** are the other half of the design: where a collector *probes* one
+topic in isolation, an advisor *derives* an answer from the finished scan — the
+local-LLM verdict spans CPU, memory, GPU and disk at once, so it reads them
+rather than re-detecting them. Pure input-to-output, no probing, no network
+(ADR-019).
+
 The three report renderers and the diff live in `report/` and follow the same
 rule as the collectors — they walk `Inventory.sections` generically and never
 import a collector. The HTML report is **self-contained** (inline CSS + vanilla
@@ -180,6 +220,8 @@ two saved scans, displayed by separate text/HTML/JSON formatters.
   copy-as-JSON) + scan diff between two saved scans.
 - **F5** ✅ — packaged single-file binaries per OS (PyInstaller), a tag-triggered
   release workflow, and the double-click → HTML report experience.
+- **F6** ✅ — local-LLM fit advisor: which Ollama model this machine can run,
+  derived from the scan (`--ollama`).
 
 All numbered phases are complete.
 

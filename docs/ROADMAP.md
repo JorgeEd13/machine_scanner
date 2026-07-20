@@ -159,3 +159,26 @@
 - **Full report-content i18n** (translating section labels / values, not just the
   filename) — deferred: it conflicts with the "English everywhere" rule and is a
   real i18n effort. F5 only localizes the default *filename*.
+
+## F6 — Local-LLM fit advisor  ✅ (2026-07-20)
+
+- **Objective:** answer the question that follows "what is this machine?" —
+  *"which local LLM can it actually run?"* — from a scan alone, on a box where
+  nothing is installed yet.
+- **How:** a new pure layer, `advisor/` (**not** a 17th collector — ADR-019).
+  `catalog.py` holds the public Ollama model catalog with RAM / VRAM / download
+  size / a coarse quality rank; `fit.py` derives usable memory from a completed
+  `Inventory` (VRAM where a discrete GPU can accelerate, else 80% of system RAM)
+  and ranks the catalog against it; `summary.py` renders a short pasteable
+  verdict. CLI: the `ollama_fit` section rides along with every full scan and
+  the HTML report; `--ollama` prints only the verdict.
+- **The three traps the naive version falls into**, all handled and all tested:
+  an **integrated GPU** counted as VRAM double-counts system RAM; a **Windows
+  `AdapterRAM`** reading saturates at 4 GB and silently under-reports a big card;
+  **disk** can block a model that memory allows.
+- **DoD:** ✅ 29 offline tests (269 green, was 240), every branch driven from a
+  synthetic `Inventory` — no assumption about the host. **Verified live** on a
+  hybrid-GPU laptop (Intel iGPU + RTX 4050): the iGPU is correctly excluded and
+  the machine sized on the 4050's 6 GB VRAM → `comfortable` / `qwen2.5:7b`. HTML
+  report still self-contained (0 external refs); `--only` correctly omits the
+  section.
