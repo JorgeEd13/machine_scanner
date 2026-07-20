@@ -11,15 +11,22 @@ collectors/                 core/                         report/
  network.py  │   register)   ├ build meta (os/host/…)            ▲
  gpu.py …    │               └ run each collector  ──► Inventory ┘ walks sections
  usb/audio/… ┘                  in try/except          (meta, [Section…])  generically
- (16 collectors)                                                  │
-                                                                  ▼
+ (17 collectors)                                                  │
+ listed in _all.py                                                ▼
                                               cli.py  (text/--json/--html/--diff)
+                                              qualifier.py  (5 collectors, verdict)
 ```
 
 `advisor/` is the F6 addition and sits between the two: pure functions that take
 a **completed** `Inventory` and derive a new `Section` from several existing ones
 at once (`ollama_fit` — which local LLM this machine can run). It probes nothing,
 so it is not a collector; `cli.py` appends it after `run_all()`. See ADR-019.
+
+`qualifier.py` is the F6.1 addition: a **second entry point and a second binary**
+that answers only "can this machine run a local AI model?" — five collectors, no
+hostname or user in the metadata, a one-page verdict instead of an inventory. It
+is separate rather than a flag so the frozen build *cannot* read what it says it
+does not read; the spec excludes the other twelve collector modules (ADR-021).
 
 `report/diff.py` is the F4 addition: a **pure** comparison of two saved
 `Inventory.to_dict()` scans (`diff_scans`) plus separate text/HTML formatters
@@ -34,7 +41,7 @@ Every collector returns the same shape — a `Section(name, title, status, data,
 notes)` — and the whole scan is an `Inventory(meta, sections)`
 (`core/models.py`). The renderers (`report/`) **walk sections generically** and
 never import a collector. Consequence: **adding a collector touches one file**
-(a new module in `collectors/`, listed in its `__init__`). The CLI and all three
+(a new module in `collectors/`, listed in `collectors/_all.py`). The CLI and all three
 renderers pick it up for free. This is the property that keeps the tool easy to
 extend as hardware coverage grows.
 
@@ -44,8 +51,9 @@ JSON with no custom encoder.
 ### 2. Self-registration + isolated execution
 
 Collectors register themselves at import time with `@register("name")`
-(`core/registry.py`). `run_all()` imports the `collectors` package (which
-triggers every decorator), then runs each collector **inside a `try/except`**:
+(`core/registry.py`). `run_all()` imports the load manifest `collectors/_all.py`
+(which triggers every decorator) — or skips that, with `autoload=False`, for an
+entry point that imported its own chosen few (ADR-021) — then runs each collector **inside a `try/except`**:
 a collector that raises becomes an `ERROR` section carrying the traceback, and
 the scan **still completes**. A flaky GPU probe must never cost you the CPU and
 network inventory. `--only A,B` filters the set; unknown names are ignored.
@@ -73,11 +81,15 @@ rather than crashing.
 - `core/` — no knowledge of specific collectors or output formats.
 - `collectors/` — depend on `core`; never on `report` or `cli`.
 - `advisor/` — depends on `core.models` only; never imports collectors or
-  `report`. Derives new sections from a finished `Inventory` (ADR-019).
+  `report`. Derives new sections from a finished `Inventory` (ADR-019). The one
+  exception is `advisor/requirements.py`, which reads the install-size table from
+  `collectors/llm_runtime` — data, not a probe.
 - `report/` — depend on `core.models` only; never import collectors. The diff
   (`report/diff.py`) computes over plain `to_dict()` dicts and is renderer-
   agnostic; its text/HTML formatters display but never compute.
 - `cli.py` — wires registry → advisor → renderer; the only place that knows all.
+- `qualifier.py` — a second entry point: five collectors, identity-free metadata,
+  a one-page verdict instead of an inventory. Its own binary (ADR-021).
 
 Dependencies point inward toward `core`; nothing in `core` imports outward.
 

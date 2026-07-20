@@ -103,11 +103,16 @@ class GpuVerdict:
         vram_gb: float | None,
         name: str | None,
         notes: list[str],
+        rejected_name: str | None = None,
     ) -> None:
         self.accelerated = accelerated
         self.vram_gb = vram_gb
         self.name = name
         self.notes = notes
+        # A card that exists but cannot be used. Kept because "none detected" is
+        # a lie to anyone looking at a machine that visibly has a graphics chip,
+        # and "your card is integrated" is the answer they need.
+        self.rejected_name = rejected_name
 
 
 def _pick_gpu(gpus: list[dict]) -> GpuVerdict:
@@ -122,12 +127,14 @@ def _pick_gpu(gpus: list[dict]) -> GpuVerdict:
     best: dict | None = None
     best_vram = 0.0
     saw_integrated = False
+    integrated_name: str | None = None
 
     for gpu in gpus:
         name = gpu.get("name")
         vendor = gpu.get("vendor")
         if _is_integrated(name, vendor):
             saw_integrated = True
+            integrated_name = integrated_name or name or vendor
             continue
         mb = _number(gpu.get("memory_total_mb"))
         if mb is None:
@@ -147,7 +154,8 @@ def _pick_gpu(gpus: list[dict]) -> GpuVerdict:
                 f"discrete GPU reports only {best_vram:.1f} GB — too little to "
                 "hold a model, sizing uses the CPU path"
             )
-        return GpuVerdict(False, None, None, notes)
+        rejected = (best or {}).get("name") or integrated_name
+        return GpuVerdict(False, None, None, notes, rejected_name=rejected)
 
     name = best.get("name")
     vendor = str(best.get("vendor") or "").upper()

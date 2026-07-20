@@ -67,6 +67,59 @@ NO_FIT_BAND = "unusable"
 NO_FIT_SUMMARY = "No model in the catalog fits this machine's usable memory."
 
 
+# --------------------------------------------------------------------------- #
+# Published requirement tiers
+# --------------------------------------------------------------------------- #
+#
+# The catalog above answers "what does *this* machine run?". These answer the
+# other half — "what does a machine need?" — and they are **fixed on purpose**.
+#
+# A threshold derived from the machine being measured can never be failed: every
+# box meets its own minimum by construction, and the no-go case loses its
+# reference point. So these are published bars, in the shape a buyer already
+# understands from game system requirements: check your machine against the
+# column, and the verdict tells you where you land.
+#
+# `minimum` is the weakest configuration still worth running — the 3B class.
+# Below it only 0.5-1.5B models fit, and those are confidently wrong often
+# enough that "it technically runs" is not a useful answer.
+# `recommended` is the 7B class, where answers stop being a compromise.
+
+
+class Requirement:
+    """One published bar: what a component needs, and how to say it."""
+
+    def __init__(self, label: str, minimum: float, recommended: float, unit: str = "GB") -> None:
+        self.label = label
+        self.minimum = minimum
+        self.recommended = recommended
+        self.unit = unit
+
+    def target(self, tier: str) -> float:
+        return self.minimum if tier == "minimum" else self.recommended
+
+    def format(self, value: float) -> str:
+        return f"{value:g} {self.unit}".strip()
+
+
+# Memory is expressed two ways because the same model needs different amounts
+# depending on where it runs: system RAM is shared with the OS (hence the 80%
+# rule), dedicated VRAM is not.
+REQUIREMENTS = {
+    "vram": Requirement("Graphics card", 4.0, 8.0),
+    "ram": Requirement("Memory (RAM)", 8.0, 16.0),
+    "disk": Requirement("Free disk", 5.0, 10.0),
+    "cores": Requirement("Processor", 4, 8, unit="cores"),
+}
+
+# A machine clears the memory bar by EITHER route — a 6 GB graphics card is
+# enough without 16 GB of RAM, and 16 GB of RAM is enough with no card at all.
+# Treating them as two independent requirements would fail almost every machine
+# that actually works.
+MEMORY_ROUTES = ("vram", "ram")
+
+
+
 def band_for(quality: int | None) -> tuple[str, str]:
     """Map the best fitting model's quality rank to ``(band, summary)``."""
     if quality is None:

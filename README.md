@@ -66,6 +66,13 @@ Grab the binary for your OS from the
 | Linux   | `machine-scanner-linux`       | `chmod +x machine-scanner-linux && ./machine-scanner-linux` |
 | macOS   | `machine-scanner-macos`       | `chmod +x machine-scanner-macos && ./machine-scanner-macos` |
 
+A second, smaller binary — **`ai-model-requirements-*`** — ships alongside it and
+answers one question: *can this machine run a local AI model?* It reads five
+things (processor, memory, graphics card, free disk, and whether Ollama and
+Docker are installed), writes a one-page verdict, and **contains none of the
+other collectors** — it cannot read network addresses, serial numbers or the
+device list even if asked. See [Checking a machine for local AI](#checking-a-machine-for-local-ai).
+
 **Double-clicking the binary** (no arguments) scans the machine, writes a
 self-contained HTML report next to itself, and opens it in your browser — the
 filename follows the OS language (`machine_inventory.html`, or
@@ -118,11 +125,11 @@ still renders as a readable static page (collapse falls back to native
 `<details>`). The `--diff` mode loads two saved JSON scans (it never re-scans)
 and reports sections added/removed and field-level changes.
 
-### Sizing a machine for a local LLM
+### Checking a machine for local AI
 
-Every full scan also carries a **`Local LLM Fit`** section: given the hardware it
-just found, which [Ollama](https://ollama.com) model this machine can actually
-run. `--ollama` prints only that, short enough to paste into a message:
+Every full scan carries a **`Local LLM Fit`** section: given the hardware it just
+found, which [Ollama](https://ollama.com) model this machine can actually run.
+`--ollama` prints only that, short enough to paste into a message:
 
 ```
 $ machine-scanner --ollama
@@ -150,6 +157,33 @@ reading** is flagged where it may have saturated at its 4 GB ceiling; and **free
 disk** can veto a model that memory alone would allow. Nothing is installed or
 contacted — it reads the scan it already has.
 
+**The standalone `ai-model-requirements` binary** turns the same analysis into a
+page for someone who is not going to read a report. Double-click it and it opens
+a verdict — `YES`, `YES, WITH LIMITS`, `NOT YET` or `NO` — over a Minimum /
+Recommended table in the shape of game system requirements:
+
+```
+Component       This machine        Minimum      Recommended
+--------------------------------------------------------------
+Graphics card   none usable         -- 4 GB      -- 8 GB
+                Intel(R) UHD Graphics 620 cannot run a model
+Memory (RAM)    8.0 GB              OK 8 GB      -- 16 GB
+Free disk       9 GB free           -- 11 GB     -- 16 GB
+                +2 GB to install Ollama; +4 GB to install
+                Docker
+Processor       4 cores             OK 4 cores   -- 8 cores
+```
+
+Three things that table does deliberately. The bars are **fixed and published**,
+not derived from the machine — a minimum taken from the machine being measured
+can never be failed. **Memory passes by either route**: a 6 GB graphics card is
+enough without 16 GB of RAM, and 16 GB of RAM is enough with no card at all, so
+they are scored together. And **the disk bar moves** with what is already
+installed, because a machine missing Ollama and Docker has to fit the model *and*
+both installs — reporting a flat 5 GB there would be wrong in the direction that
+only surfaces later. Failing on disk alone reads `NOT YET`, not `NO`: that is a
+ten-minute fix, not a purchase.
+
 Some details (BIOS/board serials, full disk SMART, deeper network) require
 admin/root; the report states whether the scan ran `elevated` so missing fields
 are explainable rather than silent.
@@ -174,6 +208,7 @@ are explainable rather than silent.
 | `audio`       | ✅ | sound devices — Windows `Win32_SoundDevice`, Linux `/proc/asound`, macOS `SPAudio` |
 | `bluetooth`   | ✅ | radio/adapters **and** paired devices as separate levels — Windows CIM (`PNPClass='Bluetooth'`), Linux `bluetoothctl`+`/sys/class/bluetooth`, macOS `SPBluetooth` |
 | `printers`    | ✅ | print queues — Windows `Win32_Printer`, Linux `lpstat` (CUPS), macOS `SPPrinters` |
+| `llm_runtime` | ✅ | whether Ollama and Docker are installed — presence on disk only, nothing executed |
 | `ollama_fit`  | ✅ | *derived, not probed* — which local LLM this machine can run (see below) |
 
 Output formats: **text** (default), **JSON** (`--json`), **interactive HTML**
@@ -222,6 +257,8 @@ two saved scans, displayed by separate text/HTML/JSON formatters.
   release workflow, and the double-click → HTML report experience.
 - **F6** ✅ — local-LLM fit advisor: which Ollama model this machine can run,
   derived from the scan (`--ollama`).
+- **F6.1** ✅ — `ai-model-requirements`: a second, scoped binary that answers only
+  that question, for someone who should not have to send a full inventory.
 
 All numbered phases are complete.
 

@@ -28,6 +28,13 @@ self-register via `@register`; renderers walk sections generically.
 `report`, or `cli`. The cost is an import-for-side-effect in
 `collectors/__init__.py`, which is explicit and listed.
 
+> **Addendum (2026-07-20, ADR-021):** the manifest moved out of
+> `collectors/__init__.py` into `collectors/_all.py`. The mechanism is unchanged
+> — collectors still self-register on import, and the list is still explicit —
+> but the package `__init__` no longer imports anything, so importing one
+> collector no longer imports all of them. That is what lets the requirements
+> checker ship a build containing five.
+
 ## ADR-003 — Isolate each collector; never abort the scan
 
 **Context.** A single flaky probe (e.g. `nvidia-smi` hanging, a permission
@@ -602,3 +609,92 @@ run at opposite moments:
 **The rule this leaves behind.** Reuse of one's own public engineering is fine
 and should be recorded, not hidden. Carrying content out of private or
 client-owned work is the thing the rule exists to stop, and it is untouched.
+
+---
+
+## ADR-021 — The requirements checker is a SECOND binary that bundles only the collectors it uses
+
+**Date:** 2026-07-20 · **Status:** accepted
+
+**Context.** ADR-019's advisor answers "which model fits?" inside a full scan.
+But the person who most needs that answer is a stranger who was *sent* a binary
+and has no reason to trust it yet — and handing them a full inventory means
+handing back hostname, username, IP and MAC addresses, disk serials, monitor
+serials and a list of every USB device. Roughly **13,000 characters, of which
+about 4,300 bear on the decision.**
+
+**Decision.** A second entry point (`qualifier.py`) and a second one-file binary
+(`ai-model-requirements-{windows.exe,linux,macos}`) that runs **five collectors**
+— cpu, memory, gpu, disk, llm_runtime — strips `hostname` and `user` from the
+scan metadata, and renders a one-page verdict instead of an inventory.
+
+**Why a separate binary rather than a flag.**
+
+- **The claim has to be about the artifact.** "It cannot read your serial
+  numbers" is checkable; "it does not, by default" is a promise about how it was
+  invoked. The spec `excludes` the other twelve collector modules, so there is
+  no argument that turns this build into an inventory tool.
+- **Double-click has to be the entire interaction.** The audience does not
+  discover flags.
+- **Collecting less is the product, not a limitation.** The buyer for this is
+  someone who cannot send their data to a third party. Interaction #1 asking for
+  a machine fingerprint contradicts the pitch before it is made.
+
+**The refactor it forced, and why it is an improvement anyway.** A package's
+`__init__` runs whenever any submodule is imported, so while
+`collectors/__init__.py` held the import-everything manifest, "load one
+collector" and "load all seventeen" were the same act — the excludes could not
+work. The manifest moved to `collectors/_all.py`; the package now imports
+nothing. **The set of collectors became a choice the entry point makes**, which
+is what ADR-002's self-registration always implied but could not express. The
+registry gained `run_all(autoload=False)` for callers that import their own.
+
+**Locked by test.** `test_qualifier_spec_bundles_exactly_the_scope` asserts the
+spec's `hiddenimports` equal `qualifier.SCOPE`, that no module is both bundled
+and excluded, and that **every** collector module is accounted for as one or the
+other. Drift is silent and bad in both directions: a missing module breaks the
+check on a client machine, an extra one widens what the binary can read while
+the report still claims otherwise.
+
+---
+
+## ADR-022 — Requirement bars are FIXED and published. A machine-derived minimum cannot be failed.
+
+**Date:** 2026-07-20 · **Status:** accepted
+
+**Context.** The natural way to phrase the report is "minimum and recommended for
+*your* machine". It does not survive contact with the no-go case.
+
+**The trap.** If the minimum is derived from the machine being measured, **every
+machine meets its own minimum by construction** and no machine can ever fail. A
+threshold has to come from outside the thing it is measuring.
+
+**Decision.** `catalog.REQUIREMENTS` holds fixed, published bars in the shape a
+buyer already knows from **game system requirements** — Minimum and Recommended
+columns, your machine checked against each. "What can this machine do?" is
+answered separately, by the model-range line.
+
+- **Minimum** = the 3B class: the weakest configuration still worth running.
+- **Recommended** = the 7B class: where answers stop being a compromise.
+
+**Three rules the table needs to not lie.**
+
+1. **Memory is one requirement with two routes.** A 6 GB graphics card is enough
+   without 16 GB of RAM; 16 GB of RAM is enough with no card at all. Scored
+   independently, nearly every machine that actually works would fail. They pass
+   together if *either* clears — and when neither does, only RAM is reported as
+   the blocker, because saying "you fail on two counts" when adding RAM alone
+   fixes it is discouraging and wrong.
+2. **The disk bar moves.** It is the only requirement that depends on what is
+   already installed: a machine without Ollama and Docker must fit the model
+   *and* both installs. The report says *why* the number is not the published
+   one. Install sizes are OS-dependent and taken from the **scanned** machine's
+   OS, not the one rendering the report.
+3. **A soft blocker is not a no.** Failing only on free disk is a ten-minute fix,
+   not a purchase — it reads **`NOT YET`**, not `NO`, and the report says what
+   the machine would run once the space exists. Collapsing the two loses a
+   customer who would qualify by the end of the conversation.
+
+**Corollary — a failing machine never gets a recommendation.** "Best available
+to you: llama3.1:8b" printed under a `NO` reads as a contradiction. Below the
+bar, the phrasing goes conditional: what it *would* run once the blockers clear.

@@ -45,8 +45,8 @@ def available() -> List[str]:
 
 
 def _ensure_loaded() -> None:
-    """Import the collectors package so every collector self-registers."""
-    importlib.import_module("machine_scanner.collectors")
+    """Import the load manifest so every collector self-registers."""
+    importlib.import_module("machine_scanner.collectors._all")
 
 
 def _build_meta() -> dict:
@@ -69,14 +69,20 @@ def _safe_user() -> str:
         return "unknown"
 
 
-def run_all(only: Optional[List[str]] = None) -> Inventory:
+def run_all(only: Optional[List[str]] = None, autoload: bool = True) -> Inventory:
     """Run all collectors (or just the ``only`` subset) into an Inventory.
 
     ``only`` is a list of collector names; unknown names are ignored. A failing
     collector becomes an ``ERROR`` section with the exception text in notes —
     the scan always completes.
+
+    ``autoload`` imports the full manifest (every collector). A caller that has
+    imported a chosen few itself passes ``False`` — that is what lets a build
+    exist which *cannot* run the collectors it left out, rather than merely
+    choosing not to (ADR-021).
     """
-    _ensure_loaded()
+    if autoload:
+        _ensure_loaded()
     wanted = set(only) if only else None
 
     inv = Inventory(meta=_build_meta())

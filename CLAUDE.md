@@ -38,7 +38,8 @@ A **collector** is a zero-arg callable that returns a `Section`
 becomes an `ERROR` section, the scan still completes) into an `Inventory`. The
 **report** layer (json/text/html) walks `Inventory.sections` generically and
 never imports collectors. **Adding a collector = one new module in
-`collectors/` listed in its `__init__` — zero changes elsewhere.**
+`collectors/` listed in `collectors/_all.py`, the load manifest — zero
+changes elsewhere.** (The manifest is not the package `__init__`; ADR-021.)
 
 ## Where things live
 

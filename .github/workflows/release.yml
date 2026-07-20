@@ -25,10 +25,13 @@ jobs:
         include:
           - os: windows-latest
             artifact: machine-scanner-windows.exe
+            qualifier: ai-model-requirements-windows.exe
           - os: ubuntu-latest
             artifact: machine-scanner-linux
+            qualifier: ai-model-requirements-linux
           - os: macos-latest
             artifact: machine-scanner-macos
+            qualifier: ai-model-requirements-macos
 
     steps:
       - uses: actions/checkout@v5
@@ -42,35 +45,48 @@ jobs:
       - name: Install (package + build extra)
         run: python -m pip install --upgrade pip && python -m pip install -e ".[build]"
 
-      - name: Build the one-file binary
-        run: pyinstaller build/machine_scanner.spec --noconfirm
+      - name: Build the one-file binaries
+        run: |
+          pyinstaller build/machine_scanner.spec --noconfirm
+          pyinstaller build/ai_model_requirements.spec --noconfirm
 
-      # Prove the frozen binary actually runs on its OS before we ship it: the
-      # self-registration risk (ADR-002) is that PyInstaller's static analysis
-      # misses a collector, so we assert --list returns all 16.
-      - name: Smoke test the binary (Windows)
+      # Prove the frozen binaries actually run on their OS before we ship them:
+      # the self-registration risk (ADR-002) is that PyInstaller's static
+      # analysis misses a collector, so we assert --list returns all 17.
+      - name: Smoke test the binaries (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $n = (& "dist/${{ matrix.artifact }}" --list | Where-Object { $_.Trim() -ne "" }).Count
-          if ($n -ne 16) { Write-Error "expected 16 collectors, got $n"; exit 1 }
+          if ($n -ne 17) { Write-Error "expected 17 collectors, got $n"; exit 1 }
           & "dist/${{ matrix.artifact }}" --json > $null
           if ($LASTEXITCODE -ne 0) { exit 1 }
+          $out = & "dist/${{ matrix.qualifier }}" --text
+          if ($LASTEXITCODE -ne 0) { Write-Error "qualifier failed"; exit 1 }
+          if ($out -notmatch "CAN THIS MACHINE RUN") { Write-Error "no verdict"; exit 1 }
 
-      - name: Smoke test the binary (Unix)
+      - name: Smoke test the binaries (Unix)
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          chmod +x "dist/${{ matrix.artifact }}"
+          chmod +x "dist/${{ matrix.artifact }}" "dist/${{ matrix.qualifier }}"
           n=$("dist/${{ matrix.artifact }}" --list | sed '/^[[:space:]]*$/d' | wc -l)
-          if [ "$n" -ne 16 ]; then echo "expected 16 collectors, got $n"; exit 1; fi
+          if [ "$n" -ne 17 ]; then echo "expected 17 collectors, got $n"; exit 1; fi
           "dist/${{ matrix.artifact }}" --json > /dev/null
+          "dist/${{ matrix.qualifier }}" --text | grep -q "CAN THIS MACHINE RUN"
 
-      - name: Upload build artifact
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}
+          if-no-files-found: error
+
+      - name: Upload qualifier artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.qualifier }}
+          path: dist/${{ matrix.qualifier }}
           if-no-files-found: error
 
   release:

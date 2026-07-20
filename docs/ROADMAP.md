@@ -182,3 +182,35 @@
   the machine sized on the 4050's 6 GB VRAM → `comfortable` / `qwen2.5:7b`. HTML
   report still self-contained (0 external refs); `--only` correctly omits the
   section.
+
+## F6.1 — The requirements checker as its own binary  ✅ (2026-07-20)
+
+- **Objective.** Let a non-technical stranger answer *"can my machine run this?"*
+  by double-clicking one file — **without sending back a machine fingerprint.**
+- **The finding that forced it.** A full scan is ~13,000 characters, of which
+  ~4,300 bear on the decision. The other ~8,700 include hostname, username,
+  primary IP, every MAC address, disk serials, monitor product codes and the USB
+  device list. Handing that over is a worse trade than the question deserves.
+- **How.** `qualifier.py` — a second entry point running five collectors
+  (cpu, memory, gpu, disk, llm_runtime), stripping `hostname`/`user` from the
+  metadata, rendering a one-page verdict. A second one-file spec builds
+  `ai-model-requirements-{windows.exe,linux,macos}`, which **excludes** the other
+  twelve collector modules so the claim is a property of the artifact (ADR-021).
+  New `llm_runtime` collector: is Ollama installed? is Docker? — presence on
+  disk, nothing executed, and the answer **raises the free-disk bar** by the
+  install sizes that are missing (ADR-022).
+- **Refactor it forced.** The load manifest moved from `collectors/__init__.py`
+  to `collectors/_all.py`; the package now imports nothing, so importing one
+  collector no longer imports all seventeen. `run_all(autoload=False)` for entry
+  points that bring their own.
+- **DoD.** ✅ 34 new offline tests (**300 green**, was 269). **Both binaries built
+  and run live on Linux**: the qualifier is 9.4 MB and `strings` confirms it
+  contains **none** of the twelve excluded collectors; the full scanner still
+  lists **17**. The delivered HTML page was checked against this machine's
+  hostname, username and IP — **none present**. Report is self-contained (0
+  external refs) and carries the brand mark inline.
+- **Caught by the smoke test, as designed:** the first frozen build of the *full*
+  scanner registered **zero** collectors — the registry reaches `_all.py` by
+  `importlib.import_module`, which PyInstaller's static analysis cannot see. Fixed
+  by a `hiddenimports` entry. This is precisely the ADR-002 risk the release
+  workflow asserts a *count* for rather than a clean exit.

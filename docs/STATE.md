@@ -3,11 +3,50 @@
 > Volatile, short. Update at the end of each step.
 
 **Date:** 2026-07-20
-**Phase:** F6 (local-LLM fit advisor) — ✅ **closed**. F0–F6 all done.
-ADR-019 (advisor is a derived layer, not a collector) and ADR-020 (the catalog
-port from `receivables-agent` is not a clean-room breach) for the choices.
+**Phase:** F6.1 (the requirements checker as its own binary) — ✅ **closed**.
+F0–F6.1 all done. ADR-021 (a second, scoped binary — the privacy claim is a
+property of the artifact) and ADR-022 (requirement bars are fixed and published)
+for the choices; F6's are ADR-019/020.
 
-## Current focus (F6) — done
+## Current focus (F6.1) — done
+
+**`ai-model-requirements-{windows.exe,linux,macos}`** — a second one-file binary
+for someone who was *sent* it and has no reason to trust it yet.
+
+- **It reads five things** (cpu, memory, gpu, disk, `llm_runtime`) and strips
+  `hostname`/`user` from the metadata. **The full scan is ~13,000 characters, of
+  which ~4,300 bear on the decision** — the rest is hostname, username, primary
+  IP, MAC addresses, disk serials, monitor codes and the USB device list.
+- **Separate binary, not a flag,** so the spec can **exclude** the other twelve
+  collector modules: "it cannot read your serial numbers" is then checkable
+  against the artifact rather than a promise about how it was invoked.
+- **New `llm_runtime` collector** — is Ollama installed? is Docker? Presence on
+  disk only, nothing executed (`ollama --version` contacts the local server and
+  can hang). The answer **raises the free-disk bar** by whichever install is
+  missing, and the report says why.
+- **Fixed Minimum / Recommended bars** (ADR-022), in the shape of game system
+  requirements. A minimum derived from the machine being measured can never be
+  failed — that was the trap. Memory passes by **either** route (card *or* RAM);
+  a **disk-only** blocker reads `NOT YET`, not `NO`, because that is a ten-minute
+  fix rather than a purchase; and a failing machine is never handed a "best
+  available to you" line, which under a `NO` reads as a contradiction.
+- **Refactor it forced:** the load manifest moved from `collectors/__init__.py`
+  to `collectors/_all.py` (the package now imports nothing), plus
+  `run_all(autoload=False)`. Importing one collector no longer imports all 17.
+
+### Verified (F6.1, Linux live — both binaries built)
+Qualifier **9.4 MB**; `strings` confirms **none** of the twelve excluded
+collectors are in it. Full scanner still lists **17**. The delivered HTML page
+grepped against this machine's hostname, username and IP → **none present**.
+Self-contained (0 external refs), brand mark inline. **300 tests green** (was
+269; +34 offline).
+⚠️ **The smoke test earned its keep:** the first frozen build of the *full*
+scanner registered **zero** collectors — the registry reaches `_all.py` via
+`importlib.import_module`, invisible to PyInstaller's static analysis. One
+`hiddenimports` entry fixed it. Exactly the ADR-002 risk, which is why the
+release workflow asserts a **count** and not a clean exit.
+
+## Prior phase (F6) — reference
 
 A new pure layer, `src/machine_scanner/advisor/`, answers *"which local LLM can
 this machine run?"* from a completed scan:
@@ -224,9 +263,11 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
 
 ## Next step
 
-- **Cut `v0.2.0`** — F6 added a user-visible capability (`--ollama`, a new
-  section in every report), so the next release is a minor bump, not `v0.1.0`.
-  Validate-then-tag as below.
+- **Cut `v0.2.0`** — F6/F6.1 added a user-visible capability (`--ollama`, a new
+  section in every report) and a **second binary**, so the next release is a
+  minor bump, not `v0.1.0`. Validate-then-tag as below; the release now ships
+  **six** artifacts (3 scanner + 3 qualifier) and the smoke test asserts 17
+  collectors plus a qualifier verdict on each OS.
 - **Cut `v0.1.0`** (validate-then-tag): run `release.yml` via `workflow_dispatch`
   first to confirm the 3-OS build (no public artifact), then push the tag to mint
   the GitHub Release with `machine-scanner-{windows.exe,linux,macos}`. The

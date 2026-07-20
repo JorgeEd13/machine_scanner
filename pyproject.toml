@@ -29,6 +29,8 @@ build = ["pyinstaller>=6"]
 
 [project.scripts]
 machine-scanner = "machine_scanner.cli:main"
+# The requirements check as its own command, mirroring its own binary (ADR-021).
+ai-model-requirements = "machine_scanner.qualifier:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

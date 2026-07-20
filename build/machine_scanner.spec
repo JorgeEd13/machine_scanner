@@ -51,12 +51,20 @@ a = Analysis(
     # The collectors self-register via explicit imports in
     # collectors/__init__ (ADR-002), so PyInstaller's import-graph analysis
     # already pulls them in. Listing them here too is belt-and-suspenders: it
-    # guarantees the frozen --list shows all 16 even if analysis ever changes.
+    # guarantees the frozen --list shows all 17 even if analysis ever changes.
     #
     # `advisor/` deliberately needs no entry: cli.py imports it directly, so the
     # normal import graph reaches it. Only the registry's *indirect* discovery
     # needs the safety net.
+    #
+    # The scoped twin of this spec is build/ai_model_requirements.spec (ADR-021),
+    # which bundles five collectors and excludes the rest.
     hiddenimports=[
+        # The manifest is reached by `importlib.import_module` in the registry,
+        # which static analysis cannot see. Without this entry the frozen binary
+        # registers ZERO collectors — caught by the release smoke test, and the
+        # reason that test asserts a count rather than merely a clean exit.
+        "machine_scanner.collectors._all",
         "machine_scanner.collectors.system",
         "machine_scanner.collectors.cpu",
         "machine_scanner.collectors.memory",
@@ -73,6 +81,7 @@ a = Analysis(
         "machine_scanner.collectors.battery",
         "machine_scanner.collectors.bluetooth",
         "machine_scanner.collectors.printers",
+        "machine_scanner.collectors.llm_runtime",
     ],
     hookspath=[],
     hooksconfig={},
