@@ -40,6 +40,14 @@ collectors are in it. Full scanner still lists **17**. The delivered HTML page
 grepped against this machine's hostname, username and IP → **none present**.
 Self-contained (0 external refs), brand mark inline. **300 tests green** (was
 269; +34 offline).
+⚠️ **Windows smoke-test bug (fixed 2026-07-20, first `workflow_dispatch` run):**
+the PowerShell verdict check used `if ($out -notmatch ...)`, but `&` yields a
+string array and `-notmatch` on an array *filters* rather than returning a
+boolean — so it failed a **working** binary, unconditionally. Now
+`Select-String -Quiet`, and it prints the output on failure. The `--list`==17
+assertion **passed on Windows**, which confirms the PyInstaller `_all` fix holds
+there too.
+
 ⚠️ **The smoke test earned its keep:** the first frozen build of the *full*
 scanner registered **zero** collectors — the registry reaches `_all.py` via
 `importlib.import_module`, invisible to PyInstaller's static analysis. One

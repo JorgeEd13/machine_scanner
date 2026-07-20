@@ -649,6 +649,16 @@ nothing. **The set of collectors became a choice the entry point makes**, which
 is what ADR-002's self-registration always implied but could not express. The
 registry gained `run_all(autoload=False)` for callers that import their own.
 
+**Smoke-test gotcha (2026-07-20, found on the first Windows run).** The PowerShell
+branch checked the verdict with `if ($out -notmatch "...")`. `&` on a native exe
+yields a **string array**, and `-match`/`-notmatch` on an array *filters* it
+instead of returning a boolean — so the condition was true whenever any single
+line failed to match, i.e. always. It failed a working binary. Use
+`Select-String -Quiet`, which returns an actual boolean; the Unix branch was
+already correct because `grep -q` is one. **The same shape of bug as the
+PyInstaller one below: a check that cannot pass and a check that cannot fail are
+equally worthless, and both only appear on a real runner.**
+
 **Locked by test.** `test_qualifier_spec_bundles_exactly_the_scope` asserts the
 spec's `hiddenimports` equal `qualifier.SCOPE`, that no module is both bundled
 and excluded, and that **every** collector module is accounted for as one or the

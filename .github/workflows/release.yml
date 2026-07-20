@@ -63,7 +63,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $out = & "dist/${{ matrix.qualifier }}" --text
           if ($LASTEXITCODE -ne 0) { Write-Error "qualifier failed"; exit 1 }
-          if ($out -notmatch "CAN THIS MACHINE RUN") { Write-Error "no verdict"; exit 1 }
+          # `&` yields a string[], and -match/-notmatch on an array FILTERS it
+          # rather than returning a boolean — `if ($out -notmatch ...)` is then
+          # true whenever any line fails to match, i.e. always. Select-String
+          # -Quiet returns an actual boolean.
+          if (-not ($out | Select-String -SimpleMatch -Quiet "CAN THIS MACHINE RUN")) {
+            Write-Host "--- qualifier output ---"
+            $out | ForEach-Object { Write-Host $_ }
+            Write-Error "no verdict in qualifier output"; exit 1
+          }
 
       - name: Smoke test the binaries (Unix)
         if: runner.os != 'Windows'
