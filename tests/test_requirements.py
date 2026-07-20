@@ -300,18 +300,31 @@ def test_qualifier_spec_bundles_exactly_the_scope():
 
 
 def test_importing_a_collector_does_not_drag_in_the_others():
-    """The property the spec's excludes depend on (ADR-021)."""
+    """The property the spec's excludes depend on (ADR-021).
+
+    Needs a fresh interpreter: this process has already imported the manifest,
+    so `sys.modules` here proves nothing. The subprocess **inherits** the real
+    environment with only PYTHONPATH added — replacing it outright breaks Python
+    startup on Windows, which needs SYSTEMROOT and friends to boot at all.
+    """
+    import os
+    import pathlib
     import subprocess
     import sys
 
+    src = pathlib.Path(__file__).parent.parent / "src"
     code = (
         "import machine_scanner.collectors.cpu, sys;"
         "loaded=[m for m in sys.modules if m.startswith('machine_scanner.collectors.')];"
         "print(sorted(loaded))"
     )
-    out = subprocess.run(
+    result = subprocess.run(
         [sys.executable, "-c", code],
-        capture_output=True, text=True, check=True,
-        env={"PYTHONPATH": "src", "PATH": "/usr/bin:/bin"},
-    ).stdout
-    assert "network" not in out and "usb" not in out and "storage_devices" not in out
+        capture_output=True, text=True,
+        env=dict(os.environ, PYTHONPATH=str(src)),
+    )
+    assert result.returncode == 0, result.stderr
+    out = result.stdout
+    assert "collectors.cpu" in out  # the import under test actually happened
+    for excluded in ("network", "usb", "storage_devices", "bluetooth"):
+        assert excluded not in out
