@@ -52,21 +52,27 @@ class ModelSpec:
 # `qwen2.5:3b` is the trap that prompted this: every other Qwen2.5 size here is
 # Apache-2.0, and the 3B is not — and it happens to be the highest-quality model
 # that fits a modest 4 GB machine, so it was the one most likely to be picked.
+#
+# ⚠️ **Name the licence by VERSION.** There is no one "Llama Community License":
+# 3.1, 3.2 and 3.3 are separate agreements with different required attribution
+# strings and different acceptable-use-policy URLs. A reader who takes the
+# generic name and goes looking will find the wrong document — which is exactly
+# how a Llama 3 licence ended up being read for a Llama 3.1 model.
 CATALOG = (
     ModelSpec("qwen2.5:0.5b", 1.0, 1.5, 0.4, 1, "Absolute floor — runs almost anywhere"),
     ModelSpec("qwen2.5:1.5b", 1.5, 2.0, 1.0, 2, "Tiny but tool-capable — small footprint"),
     ModelSpec("llama3.2:3b", 3.0, 4.0, 2.0, 4, "Balanced — good for ~8 GB RAM, no GPU",
-              licence="Llama Community License"),
+              licence="Llama 3.2 Community License"),
     ModelSpec("qwen2.5:3b", 3.0, 4.0, 1.9, 5, "Balanced, but research-licensed — not for business use",
               licence="Qwen Research License", commercial=False),
     ModelSpec("qwen2.5:7b", 5.0, 6.0, 4.7, 7, "Good quality — needs ~6 GB VRAM or ~10 GB RAM"),
     ModelSpec("llama3.1:8b", 6.0, 7.0, 4.9, 7, "Alternative to qwen2.5:7b",
-              licence="Llama Community License"),
+              licence="Llama 3.1 Community License"),
     ModelSpec("gemma2:9b", 7.0, 8.0, 5.4, 8, "High quality — needs ~12 GB RAM",
               licence="Gemma Terms of Use"),
     ModelSpec("qwen2.5:14b", 9.0, 10.0, 9.0, 9, "Very high quality — needs ~16 GB VRAM"),
     ModelSpec("llama3.3:70b", 42.0, 45.0, 43.0, 10, "Excellent — high-end GPU or 64 GB+ RAM",
-              licence="Llama Community License"),
+              licence="Llama 3.3 Community License"),
 )
 
 
