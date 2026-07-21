@@ -289,6 +289,17 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
 
 ## Next step
 
+- ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
+  licence per model but named the Llama ones generically. **There is no single
+  "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
+  different required attribution strings and different acceptable-use-policy
+  URLs, so a reader who took the generic name and went looking would land on the
+  wrong document. **That is not hypothetical** — reading a Llama *3* licence for
+  a Llama *3.1* model is the mistake the private counterpart nearly shipped, and
+  it matters: Llama 3 §1.b.v forbids using outputs to improve another LLM, and
+  **3.1 and 3.2 dropped that clause**. Naming the nearest version imposes a
+  restriction the user's licence does not contain. Strings only — no behaviour
+  change, 311 tests unchanged.
 - ✅ **`v0.2.1` (2026-07-21) — model LICENCES.** Every catalog entry now carries
   its licence, and a model that may not be used commercially is **listed but
   never recommended**. `qwen2.5:3b` is the case: every other Qwen2.5 size here is

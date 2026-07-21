@@ -12,4 +12,4 @@ The public entry points are the registry runner and the report renderers:
     print(to_json(inventory))
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"

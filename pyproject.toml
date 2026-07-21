@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "machine-scanner"
-version = "0.2.1"
+version = "0.2.2"
 description = "Portable, cross-platform machine inventory (hardware / OS / network) — JSON, text or HTML."
 readme = "README.md"
 requires-python = ">=3.9"
