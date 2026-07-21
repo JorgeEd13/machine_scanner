@@ -32,6 +32,8 @@ class ModelSpec:
     disk_gb: float       # approx. download size of the default tag
     quality: int         # coarse 1-10 capability rank (higher = better)
     description: str
+    licence: str = "Apache-2.0"   # the terms the USER inherits by running it
+    commercial: bool = True       # may a business run it in the ordinary course?
 
     def memory_required(self, accelerated: bool) -> float:
         """Memory this model needs, given whether a usable GPU is present."""
@@ -41,16 +43,30 @@ class ModelSpec:
 # Ordered by quality, tiny -> strong. The floor is a model that runs on almost
 # anything; the ceiling needs a workstation and is here mainly so a strong box
 # is told it is strong rather than silently capped at the mid tier.
+# ⚠️ A model being free to download does NOT mean it is free to use at work.
+# Open *weights* are not open *source*: some are released under research or
+# community licences that restrict commercial use or attach conditions. The
+# `licence`/`commercial` fields exist so this tool never headlines a model that
+# somebody would then run in their business without knowing.
+#
+# `qwen2.5:3b` is the trap that prompted this: every other Qwen2.5 size here is
+# Apache-2.0, and the 3B is not — and it happens to be the highest-quality model
+# that fits a modest 4 GB machine, so it was the one most likely to be picked.
 CATALOG = (
     ModelSpec("qwen2.5:0.5b", 1.0, 1.5, 0.4, 1, "Absolute floor — runs almost anywhere"),
     ModelSpec("qwen2.5:1.5b", 1.5, 2.0, 1.0, 2, "Tiny but tool-capable — small footprint"),
-    ModelSpec("llama3.2:3b", 3.0, 4.0, 2.0, 4, "Balanced — good for ~8 GB RAM, no GPU"),
-    ModelSpec("qwen2.5:3b", 3.0, 4.0, 1.9, 5, "Balanced — solid tool-calling at 3B"),
+    ModelSpec("llama3.2:3b", 3.0, 4.0, 2.0, 4, "Balanced — good for ~8 GB RAM, no GPU",
+              licence="Llama Community License"),
+    ModelSpec("qwen2.5:3b", 3.0, 4.0, 1.9, 5, "Balanced, but research-licensed — not for business use",
+              licence="Qwen Research License", commercial=False),
     ModelSpec("qwen2.5:7b", 5.0, 6.0, 4.7, 7, "Good quality — needs ~6 GB VRAM or ~10 GB RAM"),
-    ModelSpec("llama3.1:8b", 6.0, 7.0, 4.9, 7, "Alternative to qwen2.5:7b"),
-    ModelSpec("gemma2:9b", 7.0, 8.0, 5.4, 8, "High quality — needs ~12 GB RAM"),
+    ModelSpec("llama3.1:8b", 6.0, 7.0, 4.9, 7, "Alternative to qwen2.5:7b",
+              licence="Llama Community License"),
+    ModelSpec("gemma2:9b", 7.0, 8.0, 5.4, 8, "High quality — needs ~12 GB RAM",
+              licence="Gemma Terms of Use"),
     ModelSpec("qwen2.5:14b", 9.0, 10.0, 9.0, 9, "Very high quality — needs ~16 GB VRAM"),
-    ModelSpec("llama3.3:70b", 42.0, 45.0, 43.0, 10, "Excellent — high-end GPU or 64 GB+ RAM"),
+    ModelSpec("llama3.3:70b", 42.0, 45.0, 43.0, 10, "Excellent — high-end GPU or 64 GB+ RAM",
+              licence="Llama Community License"),
 )
 
 

@@ -265,11 +265,19 @@ def recommend(profile: FitProfile) -> tuple[dict | None, list[dict]]:
                 "fits_memory": fits_memory,
                 "fits_disk": fits_disk,
                 "fits": fits_memory and fits_disk,
+                "licence": spec.licence,
+                "commercial": spec.commercial,
             }
         )
 
+    # ⚠️ A research-licensed model stays in `rows` — it is a true statement about
+    # what the machine can run, and hiding it would make this tool less honest,
+    # not safer. It is excluded from `best`, because `best` is a RECOMMENDATION,
+    # and recommending a model somebody may not lawfully use at work is bad
+    # advice regardless of who is reading. The row carries its licence so the
+    # reader can decide for themselves.
     best = max(
-        (row for row in rows if row["fits"]),
+        (row for row in rows if row["fits"] and row["commercial"]),
         key=lambda row: row["quality"],
         default=None,
     )

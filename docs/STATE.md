@@ -289,6 +289,14 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
 
 ## Next step
 
+- ✅ **`v0.2.1` (2026-07-21) — model LICENCES.** Every catalog entry now carries
+  its licence, and a model that may not be used commercially is **listed but
+  never recommended**. `qwen2.5:3b` is the case: every other Qwen2.5 size here is
+  Apache-2.0 and the 3B is under a research licence — and it is the highest-quality
+  model that fits a modest 4 GB machine, so it was precisely the one this tool
+  headlined. **Open weights are not open source**, and "free to download" is not
+  "free to use at work". The restricted row stays visible *with its licence*:
+  hiding it would make the tool less honest, not safer. +4 tests (311).
 - ✅ **`v0.2.0` PUBLISHED (2026-07-20)** — six artifacts (3 scanner + 3
   qualifier), built from the commit that carries all three Windows fixes.
   Verified live on a real Windows box afterwards: the 8 GB machine now reads

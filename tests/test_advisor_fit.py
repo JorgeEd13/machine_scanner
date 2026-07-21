@@ -191,3 +191,48 @@ def test_every_ram_size_produces_a_coherent_section(ram):
     assert section.status in (Status.OK, Status.PARTIAL)
     assert section.data["verdict"] in ("unusable", "minimal", "workable", "comfortable")
     assert len(section.data["models"]) == 9
+
+
+# ------------------------------------------------------------- licensing ---
+#
+# A model being free to download does not mean it is free to use at work: open
+# WEIGHTS are not open SOURCE. `qwen2.5:3b` is the case that matters here —
+# every other Qwen2.5 size in the catalog is Apache-2.0 and the 3B is under a
+# research licence, and it is the highest-quality model that fits a modest 4 GB
+# machine, so it was exactly the one this tool would have headlined.
+
+
+def test_a_research_licensed_model_is_never_the_recommendation():
+    # 8 GB: comfortably enough for the 3B class, which is where the trap sits.
+    best, rows = recommend(extract_profile(_inventory(memory=8.0, disk=500.0)))
+
+    assert best is not None
+    assert best["commercial"] is True
+    assert best["name"] != "qwen2.5:3b"
+
+    trap = next(row for row in rows if row["name"] == "qwen2.5:3b")
+    assert trap["fits"] is True, "the point is that it FITS and is still not chosen"
+
+
+def test_a_restricted_model_is_still_LISTED_with_its_licence():
+    """Hiding it would make the tool less honest, not safer. It is a true
+    statement about what the machine can run; the licence lets the reader
+    decide."""
+    _, rows = recommend(extract_profile(_inventory(memory=8.0, disk=500.0)))
+
+    trap = next(row for row in rows if row["name"] == "qwen2.5:3b")
+    assert trap["commercial"] is False
+    assert trap["licence"] == "Qwen Research License"
+
+
+def test_every_model_carries_a_licence_name():
+    _, rows = recommend(extract_profile(_inventory(memory=64.0, disk=500.0)))
+
+    assert all(row["licence"] for row in rows)
+
+
+def test_excluding_it_does_not_leave_a_4gb_machine_without_a_recommendation():
+    best, _ = recommend(extract_profile(_inventory(memory=8.0, disk=500.0)))
+
+    assert best is not None
+    assert best["quality"] >= 4
