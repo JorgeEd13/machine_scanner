@@ -203,6 +203,22 @@
   to `collectors/_all.py`; the package now imports nothing, so importing one
   collector no longer imports all seventeen. `run_all(autoload=False)` for entry
   points that bring their own.
+- ⚠️ **Addendum 2026-07-22 — do NOT read the DoD below as "never run on
+  Windows".** It was written before the Windows run and says only where the
+  binaries had been executed *at that moment*. The first real Windows run
+  happened on **2026-07-20** (commit `1f88ed8`) and found **three bugs**,
+  including a live **8 GB machine reading `NO`** when it should have read
+  *YES, WITH LIMITS* — a false negative, which is the expensive direction. All
+  three fixes predate the `v0.2.0` publication, so every released binary carries
+  them. This addendum exists because the stale DoD line was in fact misread as a
+  current claim while planning `freelance` F5.9 (ADR-064), which is the third
+  time the same "a document read once, quoted as current" rot has bitten.
+  ⚠️ **Still genuinely unverified on Windows:** the recommendation lines changed
+  in **`v0.2.1`** (models carry their licence; restricted ones never recommended)
+  and **`v0.2.2`** (each Llama licence named by version), both **after** that run.
+  ✅ **Verified on real Windows output** (2026-07-22): a `10.0.19045` report was
+  grepped for hostname, username, IP and MAC — the only hit was the OS build
+  number, so ADR-016's no-fingerprint claim holds on the Windows build too.
 - **DoD.** ✅ 34 new offline tests (**300 green**, was 269). **Both binaries built
   and run live on Linux**: the qualifier is 9.4 MB and `strings` confirms it
   contains **none** of the twelve excluded collectors; the full scanner still
