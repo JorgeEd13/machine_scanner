@@ -386,3 +386,121 @@ def test_html_output_is_pure_ascii():
     html = to_requirements_html(_inv(memory=7.9, gpus=[igpu], disk=46.0, cpu=4))
     html.encode("ascii")  # raises if any non-ASCII byte survives
     assert "&#" in html  # ...because the non-ASCII became entities, not because it vanished
+
+
+# ------------------------------- the licence filter, at REPORT level (2026-07-29)
+#
+# `advisor.fit.recommend()` has always excluded non-commercial licences from its
+# `best`, and `test_advisor_fit.py` asserts it. The REPORT recomputed its own
+# `best = fitting[-1]` and threw that filter away, so the page headlined the
+# highest-quality model that FITS regardless of licence.
+#
+# ⚠️ The existing licence test sits at 8 GB, where the ceiling is commercial
+# anyway — so it could never have caught this. The trap only bites between
+# 4 and 6 GB, where `qwen2.5:3b` (Qwen Research License) IS the ceiling. A test
+# in the right file at the wrong size is a test that proves nothing.
+
+
+def _four_gb_gpu():
+    """16 GB RAM, 4 GB VRAM — passes the minimum tier, and its accelerated
+    ceiling is `qwen2.5:3b`, the one research-licensed size in the catalog.
+
+    ⚠️ Getting this machine right IS the test. A 5 GB CPU box also has that
+    ceiling, but it fails the minimum tier so no model is ever named — the
+    report never reaches the line under test. A fixture that cannot reach the
+    code proves nothing, which is how the first draft of this test passed
+    against the defect.
+    """
+    gpu = [{
+        "vendor": "NVIDIA", "name": "NVIDIA GeForce RTX 3050",
+        "memory_total_mb": 4096.0, "driver_version": "550.54",
+    }]
+    return _inv(memory=16.0, disk=500.0, cpu=8, gpus=gpu)
+
+
+def test_the_report_never_HEADLINES_a_research_licensed_model():
+    text = to_requirements_text(_four_gb_gpu())
+
+    headline = [ln for ln in text.splitlines() if "Best available to you" in ln]
+    assert headline, "a machine that fits a model must get a recommendation line"
+    assert "qwen2.5:3b" not in headline[0], (
+        "the page recommended a Qwen Research License model for business use"
+    )
+    assert "llama3.2:3b" in headline[0]
+
+
+def test_the_report_still_LISTS_the_research_licensed_ceiling():
+    """Honesty cuts both ways: it fits, and saying so is true.
+
+    Only the RECOMMENDATION is filtered — hiding the model would make the tool
+    less honest, which is the reasoning `recommend()` already records.
+    """
+    text = to_requirements_text(_four_gb_gpu())
+
+    assert "qwen2.5:3b" in text, "the model that fits must still be named"
+
+
+def test_the_report_SAYS_WHY_the_headline_is_not_the_ceiling():
+    """Otherwise two lines on one page quietly disagree and the reader is left
+    to wonder which is wrong — the failure mode `dgp-05` showed between the HTML
+    and the pasteable summary."""
+    text = to_requirements_text(_four_gb_gpu())
+
+    assert "Qwen Research License" in text
+
+
+def test_the_html_report_agrees_with_the_text_report():
+    """They disagreed on `dgp-05`: the HTML headlined llama3.1:8b while the
+    pasteable summary said qwen2.5:7b. Two renderers of one decision must not
+    diverge."""
+    inv = _four_gb_gpu()
+    html = to_requirements_html(inv)
+    headline = [
+        ln for ln in to_requirements_text(inv).splitlines()
+        if "Best available to you" in ln
+    ][0]
+
+    assert "llama3.2:3b" in headline
+    assert "llama3.2:3b" in html
+
+
+# --------------------------- the tiny-model reliability caution (2026-07-29) ---
+#
+# Measured, not estimated: `qwen2.5:1.5b` was run end to end against a real
+# document set and stated that sabbatical pay came "through overtime hours
+# rather than in cash", citing a document that says the first four weeks are
+# paid at full salary and contains no overtime clause. The verdict line above it
+# says "smaller and slower", which is the wrong caution — the problem is not
+# speed.
+
+
+def _tiny_band():
+    """16 GB RAM, 2 GB VRAM — passes the minimum tier, and its best model is
+    `qwen2.5:1.5b`.
+
+    ⚠️ The GPU is what makes this reachable. On the CPU path a machine whose
+    best model is 1.5B has under 5 GB of RAM, fails the minimum tier, and never
+    reaches a recommendation line at all — so a CPU fixture would assert nothing.
+    """
+    gpu = [{
+        "vendor": "NVIDIA", "name": "NVIDIA GeForce GTX 1050",
+        "memory_total_mb": 2048.0, "driver_version": "550.54",
+    }]
+    return _inv(memory=16.0, disk=500.0, cpu=8, gpus=gpu)
+
+
+def test_a_tiny_model_recommendation_carries_the_reliability_caution():
+    text = to_requirements_text(_tiny_band())
+
+    assert "Best available to you: qwen2.5:1.5b" in text
+    assert "not merely slower" in text
+    assert "confidently and WRONGLY" in text
+
+
+def test_a_capable_machine_gets_NO_reliability_caution():
+    """The caution must be band-specific. Printed over a 7B recommendation it
+    would be false, and a warning that appears everywhere is read nowhere."""
+    text = to_requirements_text(_inv(memory=32.0, disk=500.0, cpu=8))
+
+    assert "Best available to you" in text
+    assert "not merely slower" not in text

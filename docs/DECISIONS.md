@@ -738,3 +738,76 @@ thresholds.** All three needed someone else's actual machine.
 **Corollary — a failing machine never gets a recommendation.** "Best available
 to you: llama3.1:8b" printed under a `NO` reads as a contradiction. Below the
 bar, the phrasing goes conditional: what it *would* run once the blockers clear.
+
+---
+
+## ADR-023 — The recommendation is licence-filtered at the REPORT, and a tiny-model verdict now says why it cannot be trusted. What the 20% headroom means is left open, deliberately.
+
+**Date:** 2026-07-29 · **Status:** accepted (parts 1 and 2); **part 3 OPEN**
+
+### 1. The report threw away a filter `recommend()` had already computed
+
+`advisor/fit.py`'s `recommend()` excludes non-commercial licences from `best`,
+carefully, with the reasoning recorded beside it — and `test_advisor_fit.py`
+asserted it. **`report/requirements_report.py` then recomputed its own
+`best = fitting[-1]`**: the highest-quality model that *fits*, licence ignored.
+
+**Measured:** on a machine whose accelerated ceiling is `qwen2.5:3b` — 4 GB VRAM,
+or 4–6 GB RAM on the CPU path — the page headlined *"Best available to you:
+qwen2.5:3b"*, a **Qwen Research License** model, to a reader deciding what to run
+at work. That is precisely the trap `catalog.py`'s licence fields were added to
+prevent, and `qwen2.5:3b` is the model named in that comment as the reason.
+
+**Decision.** `_recommended(rows)` applies the commercial filter; the report's
+`best` and its verdict come from it. **The range keeps every fitting model** —
+*"this machine can run X"* is a true statement about hardware and hiding it would
+make the tool less honest, which is `recommend()`'s own reasoning. When the
+headline and the ceiling differ, the page **says why**, rather than letting two
+lines quietly disagree.
+
+⚠️ **Why no test caught it:** the licence test existed, in the right file, at the
+wrong machine size — 8 GB, where the ceiling is commercial anyway. **A fixture
+that cannot reach the defect proves nothing**, and the first draft of the new
+test repeated the mistake (a 5 GB CPU box fails the minimum tier, so no model is
+ever named and the assertion could not fire). Four tests now, each verified by
+mutation.
+
+### 2. A tiny-model recommendation now carries a reliability caution
+
+The `YES, WITH LIMITS` line says *"a smaller and slower one"*. **Speed is not the
+problem.** Run end to end against a real document set, `qwen2.5:1.5b` stated that
+sabbatical pay came *"through overtime hours rather than in cash"* — citing a
+document that says the first four weeks are paid at full salary and contains **no
+overtime clause**. Eligibility, duration and return-to-role were correct in the
+same answer, which is what makes it dangerous. The same model also ignored an
+explicit instruction to answer in a named language.
+
+**Decision.** When the recommendation is at or below `_UNRELIABLE_AT_OR_BELOW`
+(quality 2 = `qwen2.5:1.5b` and smaller), the report adds a plain caution: these
+answer confidently and wrongly while citing the document, and the size is a
+demonstration rather than something to rely on. **Band-specific on purpose** — a
+warning printed over every verdict is read on none.
+
+**This does not change what the tool reports as runnable.** The models still fit,
+still appear, still get recommended when nothing better does. What changed is the
+caution printed over them, which was measurably the wrong caution.
+
+### 3. ⚠️ OPEN — the 20% headroom does not survive contact with a real deployment
+
+`fit.py` reserves 20% of RAM for *"the OS, the desktop and the process holding
+the model"*, and on that basis tells an **8 GB** machine its best model is
+`qwen2.5:7b`. Measured on a real 8 GB Windows 10 box: Docker Desktop alone cost
+**2.15 GB**, two models **2.4 GB**, and the full stack needed **~9.2 GB on a
+7.92 GB machine** — it did not refuse, it **paged**.
+
+**Deliberately NOT changed here, and the reason is a boundary worth keeping.**
+This tool answers *"what can this machine run?"* — Ollama plus a model, which is
+a real and useful question, and 7B on 8 GB is defensible for that. It does **not**
+answer *"what can this machine run while also hosting a container stack"*, which
+is a different question belonging to whoever is deploying something.
+
+Changing the headroom would alter **public advice for everyone who runs this
+tool**, on the basis of one deployment's requirements. That may still be right —
+a note distinguishing *"the model alone"* from *"the model plus an application"*
+probably is — but it is a decision about this tool's scope, not a bug fix, and it
+should be made on purpose rather than as a side effect of a delivery.

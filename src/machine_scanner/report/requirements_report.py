@@ -63,9 +63,56 @@ def _verdict(
     return _LIMITED, "This machine can run a local AI model, but a smaller and slower one."
 
 
+# ⚠️ MEASURED, not estimated (2026-07-29). Models at or below this quality rank
+# — `qwen2.5:0.5b` and `qwen2.5:1.5b` — were run end to end against a real
+# document set on a real 8 GB Windows machine, and the 1.5B produced a
+# **confidently wrong answer about a policy it was citing**: asked about a
+# sabbatical it stated that pay came "through overtime hours rather than in
+# cash", where the document said the first four weeks are paid at full salary
+# and there is no overtime clause in it. Eligibility, duration and return-to-role
+# were correct in the same answer, which is what makes it dangerous. The same
+# model also ignored an explicit instruction to answer in a named language.
+#
+# This tool's job is to say what a machine can run, and that is unchanged: these
+# models DO run, and they stay in the range. But "smaller and slower" is the
+# wrong caution to print over them — the problem is not speed, it is that the
+# answers cannot be trusted, and a reader deciding whether this is worth doing
+# needs that said plainly.
+_UNRELIABLE_AT_OR_BELOW = 2
+
+
 def _model_range(rows: List[dict]) -> List[dict]:
-    """The models that fit, weakest first — the range this machine can run."""
+    """The models that fit, weakest first — the range this machine can run.
+
+    Deliberately includes research-licensed models: "this machine can run X" is a
+    true statement about the hardware, and hiding it would make the tool less
+    honest. What must never come from this list is a RECOMMENDATION — see
+    `_recommended`.
+    """
     return sorted([r for r in rows if r["fits"]], key=lambda r: r["quality"])
+
+
+def _recommended(rows: List[dict]) -> "dict | None":
+    """The best model this machine can run **and lawfully use at work**.
+
+    ⚠️ This exists because the report used to headline `fitting[-1]` — the best
+    model that FITS — while `advisor.fit.recommend()` was carefully excluding
+    non-commercial licences from its own `best`. The filter was computed and then
+    thrown away one module later.
+
+    Measured consequence: on a 4 GB machine `qwen2.5:3b` is both the highest-
+    quality model that fits and the only Qwen2.5 size that is **not** Apache-2.0,
+    so the page recommended a **Qwen Research License** model to a business —
+    precisely the trap `catalog.py` says the licence fields exist to prevent, and
+    the case that prompted them.
+
+    The range keeps every fitting model; only the headline is filtered.
+    """
+    return max(
+        (r for r in rows if r["fits"] and r.get("commercial", True)),
+        key=lambda r: r["quality"],
+        default=None,
+    )
 
 
 def _range_lines(ctx: dict) -> List[str]:
@@ -98,11 +145,40 @@ def _range_lines(ctx: dict) -> List[str]:
             "Meeting it would bring a small model within reach of this machine.",
         ]
 
+    # The RANGE may name a research-licensed ceiling; the RECOMMENDATION may not.
+    best = ctx.get("best")
+    if best is None:
+        return [
+            f"This machine can run models from {lo['name']} to {hi['name']}.",
+            "None of them is licensed for ordinary business use — every model "
+            "that fits carries a research or community licence with conditions.",
+        ]
     if lo["name"] == hi["name"]:
-        return [f"This machine can run: {hi['name']}  ({hi['description']})"]
+        return [
+            f"This machine can run: {best['name']}  ({best['description']})"
+        ] + _reliability_caution(best)
+    lines = [f"This machine can run models from {lo['name']} to {hi['name']}."]
+    lines.append(f"Best available to you: {best['name']}  ({best['description']})")
+    if best["name"] != hi["name"]:
+        # Say why the headline is not the ceiling, rather than letting the two
+        # lines quietly disagree — the reader can see both names.
+        lines.append(
+            f"{hi['name']} would also fit, but its {hi.get('licence', 'licence')} "
+            "is not one to rely on for business use."
+        )
+    return lines + _reliability_caution(best)
+
+
+def _reliability_caution(best: "dict | None") -> List[str]:
+    """The plain warning for the tiny band. See `_UNRELIABLE_AT_OR_BELOW`."""
+    if best is None or best.get("quality", 99) > _UNRELIABLE_AT_OR_BELOW:
+        return []
     return [
-        f"This machine can run models from {lo['name']} to {hi['name']}.",
-        f"Best available to you: {hi['name']}  ({hi['description']})",
+        "",
+        "A model this small is not merely slower — in testing it answered "
+        "questions about a document confidently and WRONGLY, while citing that "
+        "document. Treat this size as a demonstration, not something to rely on "
+        "for answers that matter.",
     ]
 
 
@@ -113,7 +189,10 @@ def _prepare(inventory: Inventory) -> dict:
     checks, disk_reasons = evaluate(inventory, profile)
     rows = section.data.get("models", [])
     fitting = _model_range(rows)
-    best = fitting[-1] if fitting else None
+    # NOT `fitting[-1]` — see `_recommended`. The verdict and the headline are
+    # both advice, and advice must not name a model the reader may not lawfully
+    # run at work.
+    best = _recommended(rows)
     blockers = failing(checks, "minimum")
     verdict, summary = _verdict(checks, best, blockers)
     return {
