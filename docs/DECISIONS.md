@@ -811,3 +811,42 @@ tool**, on the basis of one deployment's requirements. That may still be right �
 a note distinguishing *"the model alone"* from *"the model plus an application"*
 probably is — but it is a decision about this tool's scope, not a bug fix, and it
 should be made on purpose rather than as a side effect of a delivery.
+
+---
+
+## ADR-024 — Static analysis is a curated, enforced gate (and how it was almost not one)
+
+**Status:** Accepted · 2026-07-30
+
+**Context.** This repo had no `ruff`, no `mypy`, no lint gate — while every module carried
+`from __future__ import annotations` and thorough type hints. Hints nothing ever checks are
+documentation wearing a type system's clothes. An external review named it, correctly, as the
+cheapest rigor gap to close.
+
+**Decision.** ruff + mypy, enforced in CI as a **separate `lint` job** (not a matrix cell, so a
+failure names itself in the run list).
+
+- **Curated rule set, not `ALL`.** Every rule enabled is one this repo actually passes, so a red
+  gate always means a *new* defect and never a pre-existing backlog. Widening the set is a
+  deliberate change.
+- **`E501` is off, deliberately.** `ruff format` is NOT enforced: reformatting the codebase would
+  rewrite `git blame` across a commit log that is a working engineering record. Without a
+  formatter, line length is the least informative rule in the set, and the real violations left
+  are embedded markup, base64 assets and test fixtures — none of which read better wrapped.
+- **`warn_unused_ignores` is off here specifically.** This package is cross-platform:
+  `os.geteuid` exists on POSIX and not on Windows, `winreg` the other way round. An ignore that
+  is redundant on Linux is load-bearing on Windows, so the flag would force the gate to
+  contradict itself between the two halves of the CI matrix.
+- **mypy targets 3.10** because mypy no longer accepts 3.9. The package still supports 3.9 — the
+  CI test matrix proves it by *running* there, which is a stronger check than a checker flag.
+
+**Consequences.**
+
+- The type hints became load-bearing. mypy's first run found a `zip()` over collector fields with the lengths checked but not enforced (now `strict=True`), several report dicts whose declared value types were narrower than what collectors actually produce, and a field table whose casters were typed `object` so calling one was an error nothing had ever been run to see.
+- **The gate is only as good as the check that verifies it, and mine was broken.** I verified
+  locally with `ruff check . -q | grep '^Found'` — and `-q` *suppresses that very line*, so the
+  grep could never match and "clean" was printed unconditionally. CI failed minutes later on
+  findings that had been there the whole time. **Verify tools by exit code, never by grepping
+  their output**, and ask of any check: *if this were broken, would this line go red?*
+- **Adding a gate and not looking at its first run leaves it indistinguishable from a passing
+  one.** Poll `gh run list` in the same session that adds a workflow.
