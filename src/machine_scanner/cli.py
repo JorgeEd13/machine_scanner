@@ -18,6 +18,7 @@ report next to the binary and opens it in the browser instead.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sys
 import webbrowser
@@ -108,10 +109,9 @@ def _run_report(out: str | None) -> int:
     path = Path(out) if out else Path(report_filename())
     path.write_text(to_html(inventory), encoding="utf-8")
     print(f"wrote {path}", file=sys.stderr)
-    try:
+    # headless / no browser — the file on disk is the deliverable
+    with contextlib.suppress(Exception):
         webbrowser.open(path.resolve().as_uri())
-    except Exception:
-        pass  # headless / no browser — the file on disk is the deliverable
     errored = any(s.status is Status.ERROR for s in inventory.sections)
     return EXIT_COLLECTOR_ERROR if errored else EXIT_OK
 

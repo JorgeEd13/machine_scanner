@@ -18,10 +18,9 @@ Never raises: the battery-less case is the headline degrade path.
 
 from __future__ import annotations
 
-from typing import Any, Callable
-
 import glob
 import os
+from typing import Any, Callable
 
 from ..core.models import Section, Status
 from ..core.platform import current_os, run_command

@@ -18,12 +18,11 @@ A box with no GPU is ``unavailable`` (not an error); an OS we don't enumerate is
 
 from __future__ import annotations
 
-from typing import Any
-
 import contextlib
 import os
 import platform
 import shlex
+from typing import Any
 
 from ..core.models import Section, Status
 from ..core.platform import current_os, run_command

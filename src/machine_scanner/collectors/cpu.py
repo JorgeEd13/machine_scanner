@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import platform
+from typing import Any
 
 from ..core.models import Section, Status
 from ..core.registry import register
