@@ -18,7 +18,6 @@ not a public collector — it self-registers nothing.
 from __future__ import annotations
 
 import json
-from typing import Dict, List, Optional
 
 from ..core.platform import POWERSHELL_UTF8, run_command
 
@@ -51,7 +50,7 @@ _PLACEHOLDERS = {
 }
 
 
-def clean(value: object) -> Optional[str]:
+def clean(value: object) -> str | None:
     """Strip a SMBIOS string and reduce vendor placeholders to ``None``."""
     if value is None:
         return None
@@ -71,7 +70,7 @@ def _strip_bom(text: str) -> str:
     return text.encode("utf-8").decode("utf-8-sig")
 
 
-def run_cim(ps_script: str, timeout: float = 20.0) -> Optional[List[Dict]]:
+def run_cim(ps_script: str, timeout: float = 20.0) -> list[dict] | None:
     """Run a PowerShell CIM script that emits JSON; return a list of records.
 
     Returns ``None`` if the command failed or produced no parseable output, and

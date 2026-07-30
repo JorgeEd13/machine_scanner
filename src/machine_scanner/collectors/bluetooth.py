@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Dict, List, Optional, Tuple
 
 from ..core.models import Section, Status
 from ..core.platform import current_os, run_command
@@ -41,7 +40,7 @@ _BTHENUM_DEV_RE = re.compile(r"DEV_([0-9A-Fa-f]{12})")
 _BT_DEVICE_RE = re.compile(r"^Device\s+([0-9A-Fa-f:]{17})\s*(.*)$")
 
 
-def _entry(**fields) -> Dict:
+def _entry(**fields) -> dict:
     """Build a record, dropping empty fields."""
     return {key: value for key, value in fields.items() if value is not None}
 
@@ -52,7 +51,7 @@ def _format_mac(hex12: str) -> str:
     return ":".join(h[i : i + 2] for i in range(0, 12, 2))
 
 
-def _finalize(adapters: List[Dict], devices: List[Dict], notes: List[str]) -> Section:
+def _finalize(adapters: list[dict], devices: list[dict], notes: list[str]) -> Section:
     adapters = [a for a in adapters if a]
     devices = [d for d in devices if d]
     if not adapters and not devices:
@@ -84,15 +83,15 @@ _PS_BT = (
 )
 
 
-def _classify_windows(rows: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
+def _classify_windows(rows: list[dict]) -> tuple[list[dict], list[dict]]:
     """Split Bluetooth-class PnP rows into (adapters, paired devices).
 
     A remote/paired device carries ``DEV_<mac>`` in its ``PNPDeviceID``. Service
     /profile sub-nodes (``BTHENUM\\{guid}_...`` with no ``DEV_``) are noise and
     dropped; everything else is the local radio (adapter).
     """
-    adapters: List[Dict] = []
-    devices: List[Dict] = []
+    adapters: list[dict] = []
+    devices: list[dict] = []
     for row in rows:
         dev_id = row.get("PNPDeviceID")
         dev_id = dev_id if isinstance(dev_id, str) else ""
@@ -136,16 +135,16 @@ def _collect_windows() -> Section:
 _SYSFS_BT = "/sys/class/bluetooth"
 
 
-def _read(path: str) -> Optional[str]:
+def _read(path: str) -> str | None:
     try:
-        with open(path, "r", errors="replace") as handle:
+        with open(path, errors="replace") as handle:
             return handle.read().strip() or None
     except (FileNotFoundError, PermissionError, OSError):
         return None
 
 
-def _parse_bluetoothctl(out: str) -> List[Dict]:
-    devices: List[Dict] = []
+def _parse_bluetoothctl(out: str) -> list[dict]:
+    devices: list[dict] = []
     for line in out.splitlines():
         match = _BT_DEVICE_RE.match(line.strip())
         if not match:
@@ -155,11 +154,11 @@ def _parse_bluetoothctl(out: str) -> List[Dict]:
     return devices
 
 
-def _read_sysfs_adapters(root: str = _SYSFS_BT) -> List[Dict]:
+def _read_sysfs_adapters(root: str = _SYSFS_BT) -> list[dict]:
     """List hciX radios under /sys/class/bluetooth (adapter-level)."""
     if not os.path.isdir(root):
         return []
-    adapters: List[Dict] = []
+    adapters: list[dict] = []
     for name in sorted(os.listdir(root)):
         if not name.startswith("hci"):
             continue
@@ -170,7 +169,7 @@ def _read_sysfs_adapters(root: str = _SYSFS_BT) -> List[Dict]:
 
 def _collect_linux(sysfs_bt: str = _SYSFS_BT) -> Section:
     adapters = _read_sysfs_adapters(sysfs_bt)
-    notes: List[str] = []
+    notes: list[str] = []
     out = run_command(["bluetoothctl", "devices"])
     if out and out.strip():
         devices = _parse_bluetoothctl(out)
@@ -195,18 +194,18 @@ def _collect_linux(sysfs_bt: str = _SYSFS_BT) -> Section:
 # macOS — system_profiler SPBluetoothDataType
 # --------------------------------------------------------------------------- #
 
-def _parse_macos(out: str) -> Tuple[List[Dict], List[Dict]]:
+def _parse_macos(out: str) -> tuple[list[dict], list[dict]]:
     """Lift the controller block and the Connected / Not Connected device groups.
 
     ``SPBluetoothDataType`` nests a ``Bluetooth Controller:`` block (the adapter)
     and one or more device groups (``Connected:`` / ``Not Connected:``); inside a
     group each indented ``Name:`` header starts a device, with ``Address:`` below.
     """
-    adapters: List[Dict] = []
-    devices: List[Dict] = []
-    section: Optional[str] = None  # "controller" | "devices"
-    current_adapter: Optional[Dict] = None
-    current_device: Optional[Dict] = None
+    adapters: list[dict] = []
+    devices: list[dict] = []
+    section: str | None = None  # "controller" | "devices"
+    current_adapter: dict | None = None
+    current_device: dict | None = None
     for raw in out.splitlines():
         line = raw.strip()
         if not line:

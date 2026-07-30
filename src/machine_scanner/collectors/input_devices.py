@@ -18,21 +18,20 @@ Never raises.
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional
 
 from ..core.models import Section, Status
-from ..core.platform import current_os, run_command
+from ..core.platform import current_os
 from ..core.registry import register
 from . import _smbios
 
 _TITLE = "Input Devices"
 
 
-def _entry(**fields) -> Dict:
+def _entry(**fields) -> dict:
     return {key: value for key, value in fields.items() if value is not None}
 
 
-def _finalize(devices: List[Dict], notes: List[str]) -> Section:
+def _finalize(devices: list[dict], notes: list[str]) -> Section:
     populated = [d for d in devices if d]
     if not populated:
         return Section("input", _TITLE, Status.UNAVAILABLE, {"devices": []}, notes)
@@ -82,7 +81,7 @@ _NAME_RE = re.compile(r'^N:\s*Name="(.*)"')
 _HANDLERS_RE = re.compile(r"^H:\s*Handlers=(.*)")
 
 
-def _classify(handlers: str) -> Optional[str]:
+def _classify(handlers: str) -> str | None:
     tokens = handlers.split()
     if any(t.startswith("kbd") for t in tokens):
         return "keyboard"
@@ -91,11 +90,11 @@ def _classify(handlers: str) -> Optional[str]:
     return None
 
 
-def _parse_proc_input(text: str) -> List[Dict]:
+def _parse_proc_input(text: str) -> list[dict]:
     """Parse the blank-line-separated device blocks; keep keyboards/pointers."""
-    devices: List[Dict] = []
-    name: Optional[str] = None
-    kind: Optional[str] = None
+    devices: list[dict] = []
+    name: str | None = None
+    kind: str | None = None
     for line in text.splitlines():
         if not line.strip():  # block separator
             if name and kind:
@@ -116,7 +115,7 @@ def _parse_proc_input(text: str) -> List[Dict]:
 
 def _collect_linux(proc_input: str = _PROC_INPUT) -> Section:
     try:
-        with open(proc_input, "r", errors="replace") as handle:
+        with open(proc_input, errors="replace") as handle:
             text = handle.read()
     except (FileNotFoundError, PermissionError, OSError):
         return Section(

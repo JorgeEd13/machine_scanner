@@ -21,7 +21,7 @@ classifiers = [
 dependencies = ["psutil>=5.9"]
 
 [project.optional-dependencies]
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "ruff>=0.16", "mypy>=1.14"]
 # Build-time only — PyInstaller freezes the binaries (ROADMAP F5). Kept out of
 # the runtime deps and requirements.txt (ADR-001: psutil is the single runtime
 # dependency); installed by the release workflow and for local builds.
@@ -38,3 +38,55 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+# --------------------------------------------------------------------------- #
+# Static analysis. Enforced in CI — see .github/workflows/ci.yml.
+# The rule set is curated rather than "ALL": every rule here is one the repo
+# actually passes, so a red gate always means a new defect, never a backlog.
+# Widening the set is a deliberate change, not a wish (see docs/DECISIONS.md).
+# --------------------------------------------------------------------------- #
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM", "RET", "PIE", "RUF"]
+ignore = [
+    "RUF001",  # ambiguous unicode in strings — the reports use box-drawing glyphs
+    "RUF002",
+    "RUF003",
+    "SIM108",  # ternary is not always more readable than if/else
+    # E501 is deliberately OFF. `ruff format` is NOT enforced here: reformatting
+    # ~33k lines would rewrite history for `git blame`, and the commit log is a
+    # working engineering record. Without a formatter, line length is the least
+    # informative rule in the set, and every real violation left is an embedded
+    # CSS/JS block, a base64 asset or a test fixture — none of which read better
+    # wrapped. The rules that catch defects (F, B, UP, SIM, RET, C4, RUF) stay on.
+    "E501",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["machine_scanner"]
+
+[tool.mypy]
+# mypy 1.x no longer accepts 3.9 as a target. The package still SUPPORTS 3.9 —
+# that is proven by the CI test matrix actually running on 3.9, which is a
+# stronger check than a type-checker flag. 3.10 is the lowest mypy will take.
+python_version = "3.10"
+files = ["src"]
+ignore_missing_imports = true
+# Ratchet, not a wall: these are the levels the code passes TODAY and CI holds.
+# Tightening happens per-module (see [[tool.mypy.overrides]]) so the gate stays
+# green and every step forward is a real, reviewed change.
+warn_unused_configs = true
+warn_redundant_casts = true
+# warn_unused_ignores is deliberately OFF here (and only here). This package is
+# cross-platform: `os.geteuid` exists on POSIX and not on Windows, `winreg` the
+# other way round. An ignore that is redundant on Linux is load-bearing on
+# Windows, so the flag would force the gate to contradict itself between the two
+# halves of the CI matrix. The other repos keep it on.
+warn_unused_ignores = false
+no_implicit_optional = true
+strict_equality = true
+check_untyped_defs = true

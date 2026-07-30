@@ -15,7 +15,6 @@ from __future__ import annotations
 import os
 import platform
 import subprocess
-from typing import List, Optional
 
 # Windows PowerShell 5.1 writes stdout in the console **OEM** code page (e.g.
 # cp850 on a pt-BR box), not UTF-8. Prefixing a PowerShell command with this
@@ -54,7 +53,7 @@ def is_admin() -> bool:
         return False
 
 
-def run_command(args: List[str], timeout: float = 5.0) -> Optional[str]:
+def run_command(args: list[str], timeout: float = 5.0) -> str | None:
     """Run a command and return stdout, or ``None`` on any failure.
 
     Guards the three failure modes that would otherwise break a scan: the

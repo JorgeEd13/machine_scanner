@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Dict, List, Optional, Tuple
 
 from ..core.models import Section, Status
 from ..core.platform import current_os, run_command
@@ -43,12 +42,12 @@ _LSUSB_RE = re.compile(
 )
 
 
-def _entry(**fields) -> Dict:
+def _entry(**fields) -> dict:
     """Build a device record, dropping empty fields."""
     return {key: value for key, value in fields.items() if value is not None}
 
 
-def _finalize(devices: List[Dict], notes: List[str]) -> Section:
+def _finalize(devices: list[dict], notes: list[str]) -> Section:
     populated = [d for d in devices if d]
     if not populated:
         return Section("usb", _TITLE, Status.UNAVAILABLE, {"devices": []}, notes)
@@ -67,7 +66,7 @@ _PS_USB = (
 )
 
 
-def _vid_pid(device_id: object) -> Tuple[Optional[str], Optional[str]]:
+def _vid_pid(device_id: object) -> tuple[str | None, str | None]:
     """Extract a lower-cased VID/PID pair from a USB device id, if present."""
     if not isinstance(device_id, str):
         return None, None
@@ -84,7 +83,7 @@ def _collect_windows() -> Section:
             "usb", _TITLE, Status.UNAVAILABLE, {"devices": []},
             ["could not enumerate USB devices via CIM (Win32_PnPEntity)"],
         )
-    devices: List[Dict] = []
+    devices: list[dict] = []
     for row in rows:
         vid, pid = _vid_pid(row.get("PNPDeviceID"))
         devices.append(
@@ -105,8 +104,8 @@ def _collect_windows() -> Section:
 _SYSFS_USB = "/sys/bus/usb/devices"
 
 
-def _parse_lsusb(out: str) -> List[Dict]:
-    devices: List[Dict] = []
+def _parse_lsusb(out: str) -> list[dict]:
+    devices: list[dict] = []
     for line in out.splitlines():
         match = _LSUSB_RE.match(line.strip())
         if not match:
@@ -116,15 +115,15 @@ def _parse_lsusb(out: str) -> List[Dict]:
     return devices
 
 
-def _read_sysfs_file(path: str) -> Optional[str]:
+def _read_sysfs_file(path: str) -> str | None:
     try:
-        with open(path, "r", errors="replace") as handle:
+        with open(path, errors="replace") as handle:
             return handle.read().strip() or None
     except (FileNotFoundError, PermissionError, OSError):
         return None
 
 
-def _parse_sysfs_usb(root: str = _SYSFS_USB) -> List[Dict]:
+def _parse_sysfs_usb(root: str = _SYSFS_USB) -> list[dict]:
     """Read VID/PID/names from the device dirs under /sys/bus/usb/devices.
 
     Interface nodes (names containing ``:``) carry no ``idVendor`` and are
@@ -132,7 +131,7 @@ def _parse_sysfs_usb(root: str = _SYSFS_USB) -> List[Dict]:
     """
     if not os.path.isdir(root):
         return []
-    devices: List[Dict] = []
+    devices: list[dict] = []
     for name in sorted(os.listdir(root)):
         if ":" in name:  # interface, not a device
             continue
@@ -172,7 +171,7 @@ def _collect_linux() -> Section:
 # macOS — system_profiler SPUSBDataType
 # --------------------------------------------------------------------------- #
 
-def _parse_macos(out: str) -> List[Dict]:
+def _parse_macos(out: str) -> list[dict]:
     """Walk the indented SPUSBDataType tree, pairing each device header with its
     Product ID / Vendor ID / Manufacturer fields.
 
@@ -180,8 +179,8 @@ def _parse_macos(out: str) -> List[Dict]:
     its attributes follow as ``key: value`` at a deeper indent until the next
     header.
     """
-    devices: List[Dict] = []
-    current: Optional[Dict] = None
+    devices: list[dict] = []
+    current: dict | None = None
     for raw in out.splitlines():
         line = raw.strip()
         if not line or line == "USB:":
@@ -205,7 +204,7 @@ def _parse_macos(out: str) -> List[Dict]:
     return [d for d in cleaned if d.get("vendor_id") or d.get("product_id")]
 
 
-def _hex_id(value: str) -> Optional[str]:
+def _hex_id(value: str) -> str | None:
     """Normalize a '0x8087' (possibly with a trailing comment) to '8087'."""
     token = value.split()[0] if value else ""
     if token.lower().startswith("0x"):

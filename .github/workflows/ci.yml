@@ -7,6 +7,30 @@ on:
   workflow_dispatch:
 
 jobs:
+
+  lint:
+    name: ruff + mypy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install (package + dev extras)
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+
+      # The gate is deliberately a separate job from the test matrix: it runs
+      # once, not per OS/version, and a lint failure names itself in the run list
+      # instead of hiding inside a matrix cell.
+      - name: ruff
+        run: python -m ruff check .
+
+      - name: mypy
+        run: python -m mypy
   test:
     name: pytest (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}

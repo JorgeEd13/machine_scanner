@@ -7,6 +7,8 @@ the registry + reporting pipeline is wired up correctly.
 
 from __future__ import annotations
 
+from typing import Any
+
 import datetime as _dt
 import platform
 
@@ -18,7 +20,7 @@ from . import _psutil
 
 @register("system")
 def collect() -> Section:
-    data = {
+    data: dict[str, Any] = {
         "os": plat.current_os(),
         "system": platform.system(),
         "release": platform.release(),

@@ -18,10 +18,12 @@ A box with no GPU is ``unavailable`` (not an error); an OS we don't enumerate is
 
 from __future__ import annotations
 
+from typing import Any
+
+import contextlib
 import os
 import platform
 import shlex
-from typing import Dict, List, Optional, Tuple
 
 from ..core.models import Section, Status
 from ..core.platform import current_os, run_command
@@ -46,7 +48,7 @@ _FORMAT = "--format=csv,noheader,nounits"
 _FIELDS = ["name", "memory_total_mb", "memory_used_mb", "driver_version", "temperature_c"]
 
 
-def _query_nvidia() -> Optional[List[Dict]]:
+def _query_nvidia() -> list[dict] | None:
     for cmd in _NVIDIA_SMI_CANDIDATES:
         out = run_command([cmd, _QUERY, _FORMAT])
         if not out:
@@ -56,13 +58,13 @@ def _query_nvidia() -> Optional[List[Dict]]:
             parts = [p.strip() for p in line.split(",")]
             if len(parts) != len(_FIELDS):
                 continue
-            entry = dict(zip(_FIELDS, parts))
+            # len(parts) == len(_FIELDS) was checked above; strict makes that
+            # invariant fail loudly instead of silently dropping a column.
+            entry: dict[str, Any] = dict(zip(_FIELDS, parts, strict=True))
             # numeric fields come back as bare strings — coerce when possible
             for key in ("memory_total_mb", "memory_used_mb", "temperature_c"):
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     entry[key] = float(entry[key])
-                except (ValueError, TypeError):
-                    pass
             entry["vendor"] = "NVIDIA"
             gpus.append(entry)
         return gpus or None
@@ -73,7 +75,7 @@ def _query_nvidia() -> Optional[List[Dict]]:
 # vendor / unit helpers
 # --------------------------------------------------------------------------- #
 
-def _classify_vendor(text: object) -> Optional[str]:
+def _classify_vendor(text: object) -> str | None:
     """Normalize a free-form vendor/name string to NVIDIA / AMD / Intel."""
     cleaned = _smbios.clean(text)
     if cleaned is None:
@@ -92,7 +94,7 @@ def _classify_vendor(text: object) -> Optional[str]:
 _PCI_VENDORS = {"10de": "NVIDIA", "1002": "AMD", "1022": "AMD", "8086": "Intel"}
 
 
-def _mb_from_text(text: str) -> Optional[float]:
+def _mb_from_text(text: str) -> float | None:
     """Parse a '1536 MB' / '2 GB' VRAM string into megabytes."""
     parts = text.strip().split()
     if not parts:
@@ -107,9 +109,9 @@ def _mb_from_text(text: str) -> Optional[float]:
     return round(value)
 
 
-def _entry(vendor, name, **extra) -> Dict:
+def _entry(vendor, name, **extra) -> dict:
     """Build a GPU record, dropping empty fields so the output stays clean."""
-    rec: Dict = {}
+    rec: dict = {}
     if vendor is not None:
         rec["vendor"] = vendor
     if name is not None:
@@ -131,12 +133,12 @@ _PS_GPU = (
 )
 
 
-def _enumerate_windows() -> Tuple[Optional[List[Dict]], List[str]]:
+def _enumerate_windows() -> tuple[list[dict] | None, list[str]]:
     rows = _smbios.run_cim(_PS_GPU)
     if rows is None:
         return None, ["could not enumerate display adapters via CIM (Win32_VideoController)"]
-    notes: List[str] = []
-    gpus: List[Dict] = []
+    notes: list[str] = []
+    gpus: list[dict] = []
     capped = False
     for row in rows:
         name = _smbios.clean(row.get("Name"))
@@ -170,8 +172,8 @@ _DRM_DIR = "/sys/class/drm"
 _GPU_PCI_CLASSES = ("vga compatible controller", "3d controller", "display controller")
 
 
-def _parse_lspci(out: str) -> List[Dict]:
-    gpus: List[Dict] = []
+def _parse_lspci(out: str) -> list[dict]:
+    gpus: list[dict] = []
     for line in out.strip().splitlines():
         try:
             fields = shlex.split(line)
@@ -186,7 +188,7 @@ def _parse_lspci(out: str) -> List[Dict]:
     return gpus
 
 
-def _enumerate_linux(drm_dir: str = _DRM_DIR) -> Tuple[Optional[List[Dict]], List[str]]:
+def _enumerate_linux(drm_dir: str = _DRM_DIR) -> tuple[list[dict] | None, list[str]]:
     out = run_command(["lspci", "-mm"])
     if out:
         return _parse_lspci(out), []
@@ -194,14 +196,14 @@ def _enumerate_linux(drm_dir: str = _DRM_DIR) -> Tuple[Optional[List[Dict]], Lis
     # Fallback: classify by PCI vendor id from sysfs (no pciutils needed, no name).
     if not os.path.isdir(drm_dir):
         return None, ["could not enumerate GPUs (no lspci and no /sys/class/drm)"]
-    gpus: List[Dict] = []
+    gpus: list[dict] = []
     for entry in sorted(os.listdir(drm_dir)):
         # real cards are card0, card1, … (skip connector nodes like card0-eDP-1)
         if not (entry.startswith("card") and entry[4:].isdigit()):
             continue
         vendor_path = os.path.join(drm_dir, entry, "device", "vendor")
         try:
-            with open(vendor_path, "r", errors="replace") as handle:
+            with open(vendor_path, errors="replace") as handle:
                 vid = handle.read().strip().lower().removeprefix("0x")
         except OSError:
             continue
@@ -214,9 +216,9 @@ def _enumerate_linux(drm_dir: str = _DRM_DIR) -> Tuple[Optional[List[Dict]], Lis
 # macOS — system_profiler SPDisplaysDataType
 # --------------------------------------------------------------------------- #
 
-def _parse_macos(out: str) -> List[Dict]:
-    gpus: List[Dict] = []
-    current: Optional[Dict] = None
+def _parse_macos(out: str) -> list[dict]:
+    gpus: list[dict] = []
+    current: dict | None = None
     for raw in out.splitlines():
         line = raw.strip()
         if line.startswith("Chipset Model:"):
@@ -233,7 +235,7 @@ def _parse_macos(out: str) -> List[Dict]:
     return gpus
 
 
-def _enumerate_macos() -> Tuple[Optional[List[Dict]], List[str]]:
+def _enumerate_macos() -> tuple[list[dict] | None, list[str]]:
     out = run_command(["system_profiler", "SPDisplaysDataType"], timeout=20.0)
     if not out or not out.strip():
         return None, ["could not enumerate GPUs via system_profiler"]
@@ -244,7 +246,7 @@ def _enumerate_macos() -> Tuple[Optional[List[Dict]], List[str]]:
 # Dispatch + merge
 # --------------------------------------------------------------------------- #
 
-def _enumerate(system: str) -> Tuple[Optional[List[Dict]], List[str]]:
+def _enumerate(system: str) -> tuple[list[dict] | None, list[str]]:
     if system == "windows":
         return _enumerate_windows()
     if system == "linux":
@@ -274,7 +276,7 @@ def collect() -> Section:
     # NVIDIA cards come from nvidia-smi (richer); everything else from the
     # generic enumerator. If nvidia-smi is absent, keep the enumerator's NVIDIA
     # rows so the card still shows up, just without the live detail.
-    gpus: List[Dict] = []
+    gpus: list[dict] = []
     if general is not None:
         for gpu in general:
             if gpu.get("vendor") == "NVIDIA" and nvidia:

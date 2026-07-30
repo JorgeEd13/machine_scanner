@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import os
 import shutil
-from typing import Dict, List, Optional
 
 from ..core.models import Section, Status
 from ..core.platform import current_os
@@ -30,7 +29,7 @@ from ..core.registry import register
 # a prerequisite is missing. Conservative and OS-dependent: Ollama ships GPU
 # runners that dominate its size, and Docker Desktop (Windows/macOS) is a VM
 # stack where Linux installs only the engine.
-INSTALL_SIZE_GB: Dict[str, Dict[str, float]] = {
+INSTALL_SIZE_GB: dict[str, dict[str, float]] = {
     "ollama": {"windows": 2.0, "macos": 2.0, "linux": 2.0, "other": 2.0},
     "docker": {"windows": 4.0, "macos": 4.0, "linux": 1.0, "other": 4.0},
 }
@@ -54,7 +53,7 @@ _DOCKER_PATHS = {
 }
 
 
-def _first_existing(paths: List[str]) -> Optional[str]:
+def _first_existing(paths: list[str]) -> str | None:
     """The first path that exists, with Windows environment variables expanded."""
     for raw in paths:
         path = os.path.expandvars(os.path.expanduser(raw))
@@ -67,7 +66,7 @@ def _first_existing(paths: List[str]) -> Optional[str]:
     return None
 
 
-def _detect(command: str, known: Dict[str, List[str]], system: str) -> Dict:
+def _detect(command: str, known: dict[str, list[str]], system: str) -> dict:
     """Locate a tool by PATH, then by well-known install location."""
     found = shutil.which(command)
     if found:
@@ -80,7 +79,7 @@ def _detect(command: str, known: Dict[str, List[str]], system: str) -> Dict:
     return {"installed": False, "path": None, "found_via": None}
 
 
-def install_size_gb(tool: str, system: Optional[str] = None) -> float:
+def install_size_gb(tool: str, system: str | None = None) -> float:
     """Approximate disk needed to install ``tool`` on this OS."""
     return INSTALL_SIZE_GB[tool].get(system or current_os(), INSTALL_SIZE_GB[tool]["other"])
 

@@ -21,7 +21,6 @@ Never raises: a headless box / disconnected connector degrades to
 from __future__ import annotations
 
 import os
-from typing import Dict, List, Optional
 
 from ..core.models import Section, Status
 from ..core.platform import current_os, run_command
@@ -31,11 +30,11 @@ from . import _smbios
 _TITLE = "Monitors / Displays"
 
 
-def _entry(**fields) -> Dict:
+def _entry(**fields) -> dict:
     return {key: value for key, value in fields.items() if value is not None}
 
 
-def _finalize(monitors: List[Dict], notes: List[str]) -> Section:
+def _finalize(monitors: list[dict], notes: list[str]) -> Section:
     populated = [m for m in monitors if m]
     if not populated:
         return Section("monitors", _TITLE, Status.UNAVAILABLE, {"monitors": []}, notes)
@@ -52,7 +51,7 @@ def _finalize(monitors: List[Dict], notes: List[str]) -> Section:
 _EDID_HEADER = b"\x00\xff\xff\xff\xff\xff\xff\x00"
 
 
-def _decode_manufacturer(b0: int, b1: int) -> Optional[str]:
+def _decode_manufacturer(b0: int, b1: int) -> str | None:
     """Bytes 8-9 pack three 5-bit letters (1=A) big-endian into the PnP ID."""
     packed = (b0 << 8) | b1
     letters = [(packed >> 10) & 0x1F, (packed >> 5) & 0x1F, packed & 0x1F]
@@ -67,15 +66,15 @@ def _descriptor_text(block: bytes) -> str:
     return text.split("\n", 1)[0].strip()
 
 
-def _parse_edid(blob: bytes) -> Optional[Dict]:
+def _parse_edid(blob: bytes) -> dict | None:
     """Parse the fixed EDID 1.x fields we care about from a 128-byte block."""
     if len(blob) < 128 or blob[:8] != _EDID_HEADER:
         return None
     manufacturer = _decode_manufacturer(blob[8], blob[9])
     product_code = blob[10] | (blob[11] << 8)          # little-endian
     serial_num = int.from_bytes(blob[12:16], "little")
-    name: Optional[str] = None
-    serial_str: Optional[str] = None
+    name: str | None = None
+    serial_str: str | None = None
     # Four 18-byte descriptors at 54/72/90/108; a display descriptor starts with
     # 00 00 00 and a type tag at byte 3 (0xFC = name, 0xFF = serial string).
     for offset in (54, 72, 90, 108):
@@ -107,7 +106,7 @@ _PS_MON = (
 )
 
 
-def _decode_charcodes(value: object) -> Optional[str]:
+def _decode_charcodes(value: object) -> str | None:
     """WmiMonitorID string fields are null-terminated uint16 char-code arrays."""
     if not isinstance(value, list):
         return None
@@ -147,7 +146,7 @@ def _collect_linux(drm_dir: str = _DRM_DIR) -> Section:
             "monitors", _TITLE, Status.UNAVAILABLE, {"monitors": []},
             [f"no DRM connectors at {drm_dir} (common on headless VMs / WSL2)"],
         )
-    monitors: List[Dict] = []
+    monitors: list[dict] = []
     for name in sorted(os.listdir(drm_dir)):
         edid_path = os.path.join(drm_dir, name, "edid")
         try:
@@ -174,13 +173,13 @@ def _collect_linux(drm_dir: str = _DRM_DIR) -> Section:
 # macOS — system_profiler SPDisplaysDataType
 # --------------------------------------------------------------------------- #
 
-def _parse_macos(out: str) -> List[Dict]:
+def _parse_macos(out: str) -> list[dict]:
     """Lift display entries from SPDisplaysDataType (displays nest under the GPU).
 
     A display header is an indented ``Name:`` line; ``Resolution`` follows.
     """
-    monitors: List[Dict] = []
-    current: Optional[Dict] = None
+    monitors: list[dict] = []
+    current: dict | None = None
     for raw in out.splitlines():
         line = raw.strip()
         if not line or line == "Graphics/Displays:":

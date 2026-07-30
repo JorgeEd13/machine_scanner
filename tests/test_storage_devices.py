@@ -13,7 +13,6 @@ import pytest
 from machine_scanner.collectors import storage_devices as sd
 from machine_scanner.core.models import Status
 
-
 # --------------------------------------------------------------------------- #
 # Unit helpers
 # --------------------------------------------------------------------------- #
@@ -309,8 +308,8 @@ def test_linux_lsblk_missing_uses_sysfs(monkeypatch, tmp_path):
 
     def fake_run(args, *a, **k):
         if args[0] == "lsblk":
-            return None  # lsblk absent
-        return None  # smartctl absent too
+            return  # lsblk absent
+        return  # smartctl absent too
 
     monkeypatch.setattr(sd, "run_command", fake_run)
     monkeypatch.setattr(sd, "is_admin", lambda: False)

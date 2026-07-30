@@ -17,7 +17,8 @@ from __future__ import annotations
 
 import html
 import json
-from typing import Any, List, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from ..core.models import Inventory, Section, Status
 from .brand import FAVICON_LINK as _FAVICON_LINK
@@ -140,7 +141,7 @@ def _scalar(value: Any) -> str:
 
 def _render_mapping(mapping: Mapping[str, Any]) -> str:
     """Render a dict as key/value rows, recursing into nested containers."""
-    rows: List[str] = []
+    rows: list[str] = []
     for key, value in mapping.items():
         klabel = html.escape(str(key))
         if _is_mapping(value) or _is_list(value):
@@ -183,9 +184,9 @@ def _render_value(value: Any) -> str:
     return f"<pre>{html.escape(str(value))}</pre>"
 
 
-def _flatten_text(value: Any) -> List[str]:
+def _flatten_text(value: Any) -> list[str]:
     """Collect every key and scalar into a flat list (for the search index)."""
-    out: List[str] = []
+    out: list[str] = []
     if _is_mapping(value):
         for key, val in value.items():
             out.append(str(key))
@@ -214,7 +215,7 @@ def _card(sec: Section) -> str:
         f'<div class="note">! {html.escape(n.splitlines()[0])}</div>' for n in sec.notes
     )
     haystack = " ".join(
-        [sec.name, sec.title] + _flatten_text(sec.data) + list(sec.notes)
+        [sec.name, sec.title, *_flatten_text(sec.data), *list(sec.notes)]
     ).lower()
     sec_json = json.dumps(_section_dict(sec), ensure_ascii=False, indent=2)
     body = _render_value(sec.data) if sec.data else '<span class="muted">(no data)</span>'

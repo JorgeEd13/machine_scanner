@@ -9,7 +9,8 @@ record print as ``key: value``, and an empty list prints ``(none)``.
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from ..core.models import Inventory, Status
 

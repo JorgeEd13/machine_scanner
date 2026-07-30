@@ -14,7 +14,6 @@ import pytest
 from machine_scanner.collectors import baseboard
 from machine_scanner.core.models import Status
 
-
 # --------------------------------------------------------------------------- #
 # placeholder scrubbing
 # --------------------------------------------------------------------------- #

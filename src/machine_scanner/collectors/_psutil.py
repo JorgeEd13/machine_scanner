@@ -8,13 +8,13 @@ handle ``None``.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
-_psutil: Optional[Any] = None
+_psutil: Any | None = None
 _tried = False
 
 
-def get() -> Optional[Any]:
+def get() -> Any | None:
     """Return the psutil module, or ``None`` if it isn't installed."""
     global _psutil, _tried
     if not _tried:

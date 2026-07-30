@@ -21,6 +21,7 @@ against the output rather than taken on faith.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import sys
 import webbrowser
 from pathlib import Path
@@ -73,7 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: "list[str] | None" = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     inventory = _scan()
 
@@ -90,10 +91,8 @@ def main(argv: "list[str] | None" = None) -> int:
 
     # A double-clicked binary whose console flashes and closes has told the user
     # nothing. Opening the page is the whole delivery.
-    try:
+    with contextlib.suppress(Exception):
         webbrowser.open(path.resolve().as_uri())
-    except Exception:
-        pass
 
     # Always 0: "your machine cannot run this" is an answer, not a failure, and a
     # non-zero exit would make a launcher or an antivirus sandbox report a crash.

@@ -29,7 +29,8 @@ the machine they run on.
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from ..core.models import Inventory, Section, Status
 from .catalog import CATALOG, band_for
@@ -72,7 +73,7 @@ def _rows(section: Section | None, key: str) -> list[dict]:
     value = section.data.get(key)
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         return []
-    return [row for row in value if isinstance(row, Mapping)]
+    return [dict(row) for row in value if isinstance(row, Mapping)]
 
 
 def _number(value: Any) -> float | None:

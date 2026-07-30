@@ -455,10 +455,10 @@ def test_the_html_report_agrees_with_the_text_report():
     diverge."""
     inv = _four_gb_gpu()
     html = to_requirements_html(inv)
-    headline = [
+    headline = next(
         ln for ln in to_requirements_text(inv).splitlines()
         if "Best available to you" in ln
-    ][0]
+    )
 
     assert "llama3.2:3b" in headline
     assert "llama3.2:3b" in html

@@ -16,7 +16,7 @@ import importlib
 import platform as _platform
 import socket
 import traceback
-from typing import Callable, List, Optional
+from typing import Callable
 
 from .. import __version__
 from . import platform as plat
@@ -25,7 +25,7 @@ from .models import Inventory, Section, Status
 # A collector is any zero-arg callable returning a Section.
 Collector = Callable[[], Section]
 
-_REGISTRY: "list[tuple[str, Collector]]" = []
+_REGISTRY: list[tuple[str, Collector]] = []
 
 
 def register(name: str) -> Callable[[Collector], Collector]:
@@ -38,7 +38,7 @@ def register(name: str) -> Callable[[Collector], Collector]:
     return _wrap
 
 
-def available() -> List[str]:
+def available() -> list[str]:
     """Names of all registered collectors, in registration order."""
     _ensure_loaded()
     return [name for name, _ in _REGISTRY]
@@ -69,7 +69,7 @@ def _safe_user() -> str:
         return "unknown"
 
 
-def run_all(only: Optional[List[str]] = None, autoload: bool = True) -> Inventory:
+def run_all(only: list[str] | None = None, autoload: bool = True) -> Inventory:
     """Run all collectors (or just the ``only`` subset) into an Inventory.
 
     ``only`` is a list of collector names; unknown names are ignored. A failing

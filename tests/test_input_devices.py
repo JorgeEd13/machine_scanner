@@ -5,7 +5,6 @@ import pytest
 from machine_scanner.collectors import input_devices as inp
 from machine_scanner.core.models import Status
 
-
 # --------------------------------------------------------------------------- #
 # Windows / CIM
 # --------------------------------------------------------------------------- #

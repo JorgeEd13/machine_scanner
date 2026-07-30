@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Dict, List, Optional
 
 from ..core.models import Section, Status
 from ..core.platform import current_os, is_admin, run_command
@@ -42,12 +41,12 @@ _TITLE = "Storage Drives"
 _GB = 1024 ** 3
 
 
-def _entry(**fields) -> Dict:
+def _entry(**fields) -> dict:
     """Build a drive record, dropping empty fields."""
     return {key: value for key, value in fields.items() if value is not None}
 
 
-def _bytes_to_gb(value: object) -> Optional[float]:
+def _bytes_to_gb(value: object) -> float | None:
     """Coerce a byte count (int, float, or digit string) to GB."""
     if isinstance(value, bool):
         return None
@@ -59,7 +58,7 @@ def _bytes_to_gb(value: object) -> Optional[float]:
     return None
 
 
-def _finalize(drives: List[Dict], notes: List[str], *, smart_gated: bool = False) -> Section:
+def _finalize(drives: list[dict], notes: list[str], *, smart_gated: bool = False) -> Section:
     """Decide the section status from what was collected.
 
     - no readable physical drive at all            -> UNAVAILABLE
@@ -118,13 +117,13 @@ _PS_DISKDRIVE = (
 )
 
 
-def _label_from_code(value: object, table: Dict[int, str]) -> Optional[str]:
+def _label_from_code(value: object, table: dict[int, str]) -> str | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     return table.get(int(value))
 
 
-def _drive_from_msft(row: Dict) -> Dict:
+def _drive_from_msft(row: dict) -> dict:
     spindle = row.get("SpindleSpeed")
     return _entry(
         model=_smbios.clean(row.get("Model")) or _smbios.clean(row.get("FriendlyName")),
@@ -139,7 +138,7 @@ def _drive_from_msft(row: Dict) -> Dict:
     )
 
 
-def _drive_from_win32(row: Dict) -> Dict:
+def _drive_from_win32(row: dict) -> dict:
     return _entry(
         model=_smbios.clean(row.get("Model")),
         serial=_smbios.clean(row.get("SerialNumber")),
@@ -150,7 +149,7 @@ def _drive_from_win32(row: Dict) -> Dict:
     )
 
 
-def _smart_predicts_failure(smart_rows: List[Dict]) -> Optional[bool]:
+def _smart_predicts_failure(smart_rows: list[dict]) -> bool | None:
     """Reduce the predictive-failure rows to a single 'any drive failing?' bool.
 
     We deliberately do *not* try to map each predictive-failure row back to a
@@ -167,8 +166,8 @@ def _smart_predicts_failure(smart_rows: List[Dict]) -> Optional[bool]:
 
 def _collect_windows() -> Section:
     rows = _smbios.run_cim(_PS_PHYSICAL)
-    drives: List[Dict] = []
-    notes: List[str] = []
+    drives: list[dict] = []
+    notes: list[str] = []
     if rows:
         drives = [_drive_from_msft(r) for r in rows]
     else:
@@ -221,14 +220,14 @@ _LINUX_TRAN = {
 _LINUX_SKIP = ("loop", "ram", "sr", "dm-", "md", "zram", "fd", "nbd")
 
 
-def _bus_label(tran: object) -> Optional[str]:
+def _bus_label(tran: object) -> str | None:
     if not tran:
         return None
     text = str(tran).strip().lower()
     return _LINUX_TRAN.get(text, text.upper() or None)
 
 
-def _media_from_rota(rota: object) -> Optional[str]:
+def _media_from_rota(rota: object) -> str | None:
     text = str(rota).strip()
     if text in ("1", "True"):
         return "HDD"
@@ -237,7 +236,7 @@ def _media_from_rota(rota: object) -> Optional[str]:
     return None
 
 
-def _drive_from_lsblk(dev: Dict) -> Dict:
+def _drive_from_lsblk(dev: dict) -> dict:
     return _entry(
         name=_smbios.clean(dev.get("name")),
         model=_smbios.clean(dev.get("model")),
@@ -249,10 +248,10 @@ def _drive_from_lsblk(dev: Dict) -> Dict:
     )
 
 
-def _parse_lsblk(raw: str) -> List[Dict]:
+def _parse_lsblk(raw: str) -> list[dict]:
     obj = json.loads(raw)
     devices = obj.get("blockdevices") or []
-    drives: List[Dict] = []
+    drives: list[dict] = []
     for dev in devices:
         if dev.get("type") not in (None, "disk"):
             continue
@@ -266,15 +265,15 @@ def _parse_lsblk(raw: str) -> List[Dict]:
 _SYS_BLOCK = "/sys/block"
 
 
-def _read_sysfs(path: str) -> Optional[str]:
+def _read_sysfs(path: str) -> str | None:
     try:
-        with open(path, "r", errors="replace") as handle:
+        with open(path, errors="replace") as handle:
             return handle.read().strip() or None
     except (FileNotFoundError, PermissionError, OSError):
         return None
 
 
-def _drive_from_sysfs(block_root: str, name: str) -> Dict:
+def _drive_from_sysfs(block_root: str, name: str) -> dict:
     base = os.path.join(block_root, name)
     dev = os.path.join(base, "device")
     sectors = _read_sysfs(os.path.join(base, "size"))
@@ -297,10 +296,10 @@ def _drive_from_sysfs(block_root: str, name: str) -> Dict:
     )
 
 
-def _collect_linux_sysfs(block_root: str = _SYS_BLOCK) -> List[Dict]:
+def _collect_linux_sysfs(block_root: str = _SYS_BLOCK) -> list[dict]:
     if not os.path.isdir(block_root):
         return []
-    drives: List[Dict] = []
+    drives: list[dict] = []
     for name in sorted(os.listdir(block_root)):
         if name.startswith(_LINUX_SKIP):
             continue
@@ -308,7 +307,7 @@ def _collect_linux_sysfs(block_root: str = _SYS_BLOCK) -> List[Dict]:
     return [d for d in drives if d]
 
 
-def _smart_health_linux(name: str) -> Optional[str]:
+def _smart_health_linux(name: str) -> str | None:
     """Return 'passed' / 'failed' from ``smartctl -H -j``; None if unreadable."""
     out = run_command(["smartctl", "-H", "-j", "/dev/" + name])
     if not out or not out.strip():
@@ -324,7 +323,7 @@ def _smart_health_linux(name: str) -> Optional[str]:
 
 def _collect_linux() -> Section:
     raw = run_command(["lsblk", "-d", "-b", "-O", "-J"])
-    notes: List[str] = []
+    notes: list[str] = []
     if raw and raw.strip():
         try:
             drives = _parse_lsblk(raw)
@@ -380,7 +379,7 @@ _MAC_FIELDS = {
 }
 
 
-def _mac_size_to_gb(text: str) -> Optional[float]:
+def _mac_size_to_gb(text: str) -> float | None:
     """diskutil reports e.g. '500.3 GB (500277790720 Bytes)' — prefer the bytes."""
     if "(" in text and "Bytes" in text:
         inner = text[text.index("(") + 1 : text.index("Bytes")].replace(",", "").strip()
@@ -389,7 +388,7 @@ def _mac_size_to_gb(text: str) -> Optional[float]:
     return None
 
 
-def _parse_diskutil(out: str) -> List[Dict]:
+def _parse_diskutil(out: str) -> list[dict]:
     """Parse ``diskutil info -all`` text — blocks split by a row of '****'.
 
     Only *physical* drives are kept: a block is emitted when it is explicitly
@@ -397,8 +396,8 @@ def _parse_diskutil(out: str) -> List[Dict]:
     and dropped). The separator ends the current block; a block accumulates from
     its first field, so we seed ``current`` before the loop and flush at the end.
     """
-    drives: List[Dict] = []
-    current: Dict = {}
+    drives: list[dict] = []
+    current: dict = {}
     is_physical = False
 
     def flush() -> None:

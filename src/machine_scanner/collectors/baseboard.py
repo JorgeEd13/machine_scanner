@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Dict, Optional
 
 from ..core.models import Section, Status
 from ..core.platform import POWERSHELL_UTF8, current_os, is_admin, run_command
@@ -63,7 +62,7 @@ _PLACEHOLDERS = {
 }
 
 
-def _clean(value: object) -> Optional[str]:
+def _clean(value: object) -> str | None:
     """Strip a SMBIOS string and reduce vendor placeholders to ``None``."""
     if value is None:
         return None
@@ -74,7 +73,7 @@ def _clean(value: object) -> Optional[str]:
 
 
 def _finalize(
-    data: Dict[str, Optional[str]],
+    data: dict[str, str | None],
     notes: list,
     *,
     elevated: bool,
@@ -94,7 +93,7 @@ def _finalize(
             _TITLE,
             Status.UNAVAILABLE,
             {},
-            notes + ["no motherboard / BIOS identity could be read"],
+            [*notes, "no motherboard / BIOS identity could be read"],
         )
 
     any_serial = any(data.get(f) is not None for f in _SERIAL_FIELDS)
@@ -143,7 +142,7 @@ $date  = if ($bios.ReleaseDate) { $bios.ReleaseDate.ToString('yyyy-MM-dd') } els
 """
 
 
-def _parse_windows(raw: str) -> Dict[str, Optional[str]]:
+def _parse_windows(raw: str) -> dict[str, str | None]:
     """Parse the PowerShell JSON blob into the normalized, cleaned field set."""
     obj = json.loads(raw)
     return {key: _clean(value) for key, value in obj.items()}
@@ -216,12 +215,12 @@ def _collect_linux(dmi_dir: str = _DMI_DIR) -> Section:
             [f"no DMI table exposed at {dmi_dir} (common on VMs / containers)"],
         )
 
-    data: Dict[str, Optional[str]] = {field: None for field in _DMI_MAP.values()}
+    data: dict[str, str | None] = dict.fromkeys(_DMI_MAP.values())
     blocked_by_privilege = False
     for filename, field in _DMI_MAP.items():
         path = os.path.join(dmi_dir, filename)
         try:
-            with open(path, "r", errors="replace") as handle:
+            with open(path, errors="replace") as handle:
                 data[field] = _clean(handle.read())
         except PermissionError:
             # serial / uuid files are mode 0400 (root only) — expected.
@@ -250,8 +249,8 @@ _MAC_MAP = {
 }
 
 
-def _parse_macos(raw: str) -> Dict[str, Optional[str]]:
-    data: Dict[str, Optional[str]] = {}
+def _parse_macos(raw: str) -> dict[str, str | None]:
+    data: dict[str, str | None] = {}
     for line in raw.splitlines():
         if ":" not in line:
             continue

@@ -5,7 +5,6 @@ import pytest
 from machine_scanner.collectors import audio as a
 from machine_scanner.core.models import Status
 
-
 # --------------------------------------------------------------------------- #
 # Windows / CIM
 # --------------------------------------------------------------------------- #

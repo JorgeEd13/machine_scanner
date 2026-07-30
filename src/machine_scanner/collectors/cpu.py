@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import platform
 
 from ..core.models import Section, Status
@@ -11,7 +13,7 @@ from . import _psutil
 
 @register("cpu")
 def collect() -> Section:
-    data = {
+    data: dict[str, Any] = {
         "name": platform.processor() or platform.machine() or None,
         "architecture": platform.machine(),
     }

@@ -15,7 +15,6 @@ Never raises: a box with no sound card degrades to ``unavailable``.
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional
 
 from ..core.models import Section, Status
 from ..core.platform import current_os, run_command
@@ -25,11 +24,11 @@ from . import _smbios
 _TITLE = "Audio Devices"
 
 
-def _entry(**fields) -> Dict:
+def _entry(**fields) -> dict:
     return {key: value for key, value in fields.items() if value is not None}
 
 
-def _finalize(devices: List[Dict], notes: List[str]) -> Section:
+def _finalize(devices: list[dict], notes: list[str]) -> Section:
     populated = [d for d in devices if d]
     if not populated:
         return Section("audio", _TITLE, Status.UNAVAILABLE, {"devices": []}, notes)
@@ -75,8 +74,8 @@ _ASOUND_CARDS = "/proc/asound/cards"
 _CARD_RE = re.compile(r"^\s*(\d+)\s*\[([^\]]+)\]\s*:\s*(.*)$")
 
 
-def _parse_asound(text: str) -> List[Dict]:
-    devices: List[Dict] = []
+def _parse_asound(text: str) -> list[dict]:
+    devices: list[dict] = []
     for line in text.splitlines():
         match = _CARD_RE.match(line)
         if not match:
@@ -88,7 +87,7 @@ def _parse_asound(text: str) -> List[Dict]:
 
 def _collect_linux(asound_cards: str = _ASOUND_CARDS) -> Section:
     try:
-        with open(asound_cards, "r", errors="replace") as handle:
+        with open(asound_cards, errors="replace") as handle:
             text = handle.read()
     except (FileNotFoundError, PermissionError, OSError):
         return Section(
@@ -105,14 +104,14 @@ def _collect_linux(asound_cards: str = _ASOUND_CARDS) -> Section:
 # macOS — system_profiler SPAudioDataType
 # --------------------------------------------------------------------------- #
 
-def _parse_macos(out: str) -> List[Dict]:
+def _parse_macos(out: str) -> list[dict]:
     """Lift the device headers under SPAudioDataType.
 
     Entries are indented ``Name:`` headers; the bus/"Devices:" group labels are
     skipped by ignoring known section words.
     """
     skip = {"Audio:", "Devices:"}
-    devices: List[Dict] = []
+    devices: list[dict] = []
     for raw in out.splitlines():
         line = raw.strip()
         if not line or line in skip:

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any
 
 
 class Status(str, Enum):
@@ -35,10 +35,10 @@ class Section:
     name: str                                   # machine key, e.g. "cpu"
     title: str                                  # human label, e.g. "CPU"
     status: Status = Status.OK
-    data: Dict[str, Any] = field(default_factory=dict)
-    notes: List[str] = field(default_factory=list)  # warnings / caveats
+    data: dict[str, Any] = field(default_factory=dict)
+    notes: list[str] = field(default_factory=list)  # warnings / caveats
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "title": self.title,
@@ -52,13 +52,13 @@ class Section:
 class Inventory:
     """A full scan: run metadata plus the ordered sections."""
 
-    meta: Dict[str, Any] = field(default_factory=dict)
-    sections: List[Section] = field(default_factory=list)
+    meta: dict[str, Any] = field(default_factory=dict)
+    sections: list[Section] = field(default_factory=list)
 
     def section(self, name: str) -> Section | None:
         return next((s for s in self.sections if s.name == name), None)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "meta": self.meta,
             "sections": [s.to_dict() for s in self.sections],

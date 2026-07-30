@@ -15,7 +15,6 @@ inline CSS, no external asset (ADR-015).
 from __future__ import annotations
 
 import html
-from typing import List
 
 from ..advisor.fit import ADVISOR_NAME, build_section, extract_profile
 from ..advisor.requirements import Check, evaluate, failing, meets_tier
@@ -50,8 +49,8 @@ READONLY_STATEMENT = (
 
 
 def _verdict(
-    checks: List[Check], best_model: "dict | None", blockers: List[Check]
-) -> "tuple[str, str]":
+    checks: list[Check], best_model: dict | None, blockers: list[Check]
+) -> tuple[str, str]:
     if best_model is None or not meets_tier(checks, "minimum"):
         if blockers and all(c.key in _SOFT_BLOCKERS for c in blockers):
             return _NOT_YET, (
@@ -81,7 +80,7 @@ def _verdict(
 _UNRELIABLE_AT_OR_BELOW = 2
 
 
-def _model_range(rows: List[dict]) -> List[dict]:
+def _model_range(rows: list[dict]) -> list[dict]:
     """The models that fit, weakest first — the range this machine can run.
 
     Deliberately includes research-licensed models: "this machine can run X" is a
@@ -92,7 +91,7 @@ def _model_range(rows: List[dict]) -> List[dict]:
     return sorted([r for r in rows if r["fits"]], key=lambda r: r["quality"])
 
 
-def _recommended(rows: List[dict]) -> "dict | None":
+def _recommended(rows: list[dict]) -> dict | None:
     """The best model this machine can run **and lawfully use at work**.
 
     ⚠️ This exists because the report used to headline `fitting[-1]` — the best
@@ -115,7 +114,7 @@ def _recommended(rows: List[dict]) -> "dict | None":
     )
 
 
-def _range_lines(ctx: dict) -> List[str]:
+def _range_lines(ctx: dict) -> list[str]:
     """The model-range sentence, phrased for the verdict it sits under.
 
     A machine can be below the published bar and still have memory for a model —
@@ -154,9 +153,7 @@ def _range_lines(ctx: dict) -> List[str]:
             "that fits carries a research or community licence with conditions.",
         ]
     if lo["name"] == hi["name"]:
-        return [
-            f"This machine can run: {best['name']}  ({best['description']})"
-        ] + _reliability_caution(best)
+        return [f"This machine can run: {best['name']}  ({best['description']})", *_reliability_caution(best)]
     lines = [f"This machine can run models from {lo['name']} to {hi['name']}."]
     lines.append(f"Best available to you: {best['name']}  ({best['description']})")
     if best["name"] != hi["name"]:
@@ -169,7 +166,7 @@ def _range_lines(ctx: dict) -> List[str]:
     return lines + _reliability_caution(best)
 
 
-def _reliability_caution(best: "dict | None") -> List[str]:
+def _reliability_caution(best: dict | None) -> list[str]:
     """The plain warning for the tiny band. See `_UNRELIABLE_AT_OR_BELOW`."""
     if best is None or best.get("quality", 99) > _UNRELIABLE_AT_OR_BELOW:
         return []
@@ -215,9 +212,9 @@ def _prepare(inventory: Inventory) -> dict:
 _MARK = {True: "OK", False: "--"}
 
 
-def _wrap(text: str, width: int) -> List[str]:
+def _wrap(text: str, width: int) -> list[str]:
     """Wrap to ``width`` without importing textwrap for one call."""
-    lines: List[str] = []
+    lines: list[str] = []
     line = ""
     for word in text.split():
         if line and len(line) + 1 + len(word) > width:
@@ -232,7 +229,7 @@ def _wrap(text: str, width: int) -> List[str]:
 
 def to_requirements_text(inventory: Inventory) -> str:
     ctx = _prepare(inventory)
-    out: List[str] = [
+    out: list[str] = [
         "",
         "  CAN THIS MACHINE RUN A LOCAL AI MODEL?",
         "  " + "=" * 62,

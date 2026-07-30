@@ -18,9 +18,10 @@ Never raises: the battery-less case is the headline degrade path.
 
 from __future__ import annotations
 
+from typing import Any, Callable
+
 import glob
 import os
-from typing import Dict, List, Optional
 
 from ..core.models import Section, Status
 from ..core.platform import current_os, run_command
@@ -32,25 +33,25 @@ _TITLE = "Battery"
 _NO_BATTERY = "no battery present (typical for a desktop)"
 
 # Win32_Battery.BatteryStatus code -> label (the common subset).
-_WIN_STATUS = {
+_WIN_STATUS: dict[Any, str] = {
     1: "discharging", 2: "on AC", 3: "fully charged", 4: "low",
     5: "critical", 6: "charging", 7: "charging (high)", 8: "charging (low)",
     9: "charging (critical)", 10: "undefined", 11: "partially charged",
 }
 
 # Win32_Battery.Chemistry code -> label.
-_WIN_CHEMISTRY = {
+_WIN_CHEMISTRY: dict[Any, str] = {
     1: "other", 2: "unknown", 3: "lead acid", 4: "nickel cadmium",
     5: "nickel metal hydride", 6: "lithium-ion", 7: "zinc air",
     8: "lithium polymer",
 }
 
 
-def _entry(**fields) -> Dict:
+def _entry(**fields) -> dict:
     return {key: value for key, value in fields.items() if value is not None}
 
 
-def _section(data: Dict, notes: List[str], status: Status = Status.OK) -> Section:
+def _section(data: dict, notes: list[str], status: Status = Status.OK) -> Section:
     return Section("battery", _TITLE, status, data, notes)
 
 
@@ -102,15 +103,15 @@ def _collect_windows() -> Section:
 _POWER_SUPPLY = "/sys/class/power_supply"
 
 
-def _read(path: str) -> Optional[str]:
+def _read(path: str) -> str | None:
     try:
-        with open(path, "r", errors="replace") as handle:
+        with open(path, errors="replace") as handle:
             return handle.read().strip() or None
     except (FileNotFoundError, PermissionError, OSError):
         return None
 
 
-def _as_int(value: Optional[str]) -> Optional[int]:
+def _as_int(value: str | None) -> int | None:
     return int(value) if value and value.lstrip("-").isdigit() else None
 
 
@@ -140,18 +141,18 @@ def _collect_linux(power_supply: str = _POWER_SUPPLY) -> Section:
 # macOS — system_profiler SPPowerDataType
 # --------------------------------------------------------------------------- #
 
-def _parse_macos(out: str) -> Optional[Dict]:
+def _parse_macos(out: str) -> dict | None:
     """Pull charge / condition / cycle count out of SPPowerDataType.
 
     Returns ``None`` when no battery section is present (a desktop Mac).
     """
-    fields = {
+    fields: dict[str, tuple[str, Callable[[str], Any]]] = {
         "State of Charge (%)": ("charge_percent", _as_int),
         "Charge Remaining (mAh)": ("charge_remaining_mah", _as_int),
         "Cycle Count": ("cycle_count", _as_int),
         "Condition": ("condition", str),
     }
-    data: Dict = {}
+    data: dict = {}
     saw_battery = False
     for raw in out.splitlines():
         line = raw.strip()

@@ -19,8 +19,6 @@ Never raises for an expected-absent case (empty slot, locked-down DMI table).
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
-
 from ..core.models import Section, Status
 from ..core.platform import current_os, is_admin, run_command
 from ..core.registry import register
@@ -43,12 +41,12 @@ _DDR_TYPES = {
 }
 
 
-def _entry(**fields) -> Dict:
+def _entry(**fields) -> dict:
     """Build a module record, dropping empty fields."""
     return {key: value for key, value in fields.items() if value is not None}
 
 
-def _finalize(modules: List[Dict], notes: List[str]) -> Section:
+def _finalize(modules: list[dict], notes: list[str]) -> Section:
     populated = [m for m in modules if m]
     if not populated:
         return Section("memory_modules", _TITLE, Status.UNAVAILABLE, {"modules": []}, notes)
@@ -70,7 +68,7 @@ _PS_MEM = (
 )
 
 
-def _type_label(code: object) -> Optional[str]:
+def _type_label(code: object) -> str | None:
     if isinstance(code, bool) or not isinstance(code, (int, float)):
         return None
     code = int(code)
@@ -86,7 +84,7 @@ def _collect_windows() -> Section:
             "memory_modules", _TITLE, Status.UNAVAILABLE, {"modules": []},
             ["could not query memory modules via CIM (Win32_PhysicalMemory)"],
         )
-    modules: List[Dict] = []
+    modules: list[dict] = []
     for row in rows:
         capacity = row.get("Capacity")
         cap_gb = None
@@ -124,9 +122,9 @@ _DMIDECODE_FIELDS = {
 }
 
 
-def _parse_dmidecode(out: str) -> List[Dict]:
-    modules: List[Dict] = []
-    current: Optional[Dict] = None
+def _parse_dmidecode(out: str) -> list[dict]:
+    modules: list[dict] = []
+    current: dict | None = None
     for raw in out.splitlines():
         if raw.startswith("Memory Device"):
             current = {}
@@ -149,20 +147,20 @@ def _parse_dmidecode(out: str) -> List[Dict]:
     return [{k: v for k, v in m.items() if v is not None} for m in modules if m.get("capacity_gb")]
 
 
-def _size_to_gb(text: str) -> Optional[float]:
+def _size_to_gb(text: str) -> float | None:
     parts = text.split()
     if len(parts) < 2 or not parts[0].replace(".", "", 1).isdigit():
         return None
     value = float(parts[0])
     unit = parts[1].lower()
-    if unit.startswith("mb") or unit.startswith("mib"):
+    if unit.startswith(("mb", "mib")):
         value /= 1024
-    elif unit.startswith("tb") or unit.startswith("tib"):
+    elif unit.startswith(("tb", "tib")):
         value *= 1024
     return round(value, 1)
 
 
-def _speed_to_mhz(text: str) -> Optional[int]:
+def _speed_to_mhz(text: str) -> int | None:
     parts = text.split()
     if not parts or not parts[0].isdigit():
         return None
@@ -174,7 +172,7 @@ def _collect_linux() -> Section:
     if not out or not out.strip():
         note = "memory modules need root via dmidecode (SMBIOS type 17 has no unprivileged sysfs); run as root"
         return Section("memory_modules", _TITLE, Status.UNAVAILABLE, {"modules": []}, [note])
-    notes: List[str] = []
+    notes: list[str] = []
     if not is_admin():
         notes.append("dmidecode usually requires root; results may be incomplete")
     return _finalize(_parse_dmidecode(out), notes)
@@ -193,9 +191,9 @@ _MAC_FIELDS = {
 }
 
 
-def _parse_macos(out: str) -> List[Dict]:
-    modules: List[Dict] = []
-    current: Optional[Dict] = None
+def _parse_macos(out: str) -> list[dict]:
+    modules: list[dict] = []
+    current: dict | None = None
     for raw in out.splitlines():
         line = raw.strip()
         # A slot header looks like "BANK 0/DIMM0:" or "DIMM0:" with nothing after.

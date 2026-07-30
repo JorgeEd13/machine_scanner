@@ -19,8 +19,6 @@ of wrong that surfaces after they have paid.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from ..collectors.llm_runtime import install_size_gb
 from ..core.models import Inventory
 from .catalog import REQUIREMENTS, nominal_ram_gb
@@ -36,7 +34,7 @@ class Check:
         self,
         key: str,
         label: str,
-        actual: Optional[float],
+        actual: float | None,
         actual_text: str,
         minimum: float,
         recommended: float,

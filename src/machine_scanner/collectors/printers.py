@@ -19,7 +19,6 @@ all expected and degrade to ``unavailable`` with an accurate note.
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional
 
 from ..core.models import Section, Status
 from ..core.platform import current_os, run_command
@@ -29,13 +28,13 @@ from . import _smbios
 _TITLE = "Printers"
 
 
-def _entry(**fields) -> Dict:
+def _entry(**fields) -> dict:
     """Build a record, dropping ``None`` fields (booleans like ``default=False``
     are kept — a printer not being the default is meaningful)."""
     return {key: value for key, value in fields.items() if value is not None}
 
 
-def _finalize(printers: List[Dict], notes: List[str]) -> Section:
+def _finalize(printers: list[dict], notes: list[str]) -> Section:
     populated = [p for p in printers if p]
     if not populated:
         return Section("printers", _TITLE, Status.UNAVAILABLE, {"printers": []}, notes)
@@ -58,7 +57,7 @@ _PS_PRINTERS = (
 )
 
 
-def _as_bool(value: object) -> Optional[bool]:
+def _as_bool(value: object) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
@@ -99,7 +98,7 @@ _LPSTAT_P_RE = re.compile(r"^printer\s+(\S+)\s+(.*)$")
 _LPSTAT_D_RE = re.compile(r"^system default destination:\s*(\S+)")
 
 
-def _printer_status(rest: str) -> Optional[str]:
+def _printer_status(rest: str) -> str | None:
     low = rest.lower()
     if "disabled" in low:
         return "disabled"
@@ -110,8 +109,8 @@ def _printer_status(rest: str) -> Optional[str]:
     return None
 
 
-def _parse_lpstat(p_out: str, default: Optional[str]) -> List[Dict]:
-    printers: List[Dict] = []
+def _parse_lpstat(p_out: str, default: str | None) -> list[dict]:
+    printers: list[dict] = []
     for line in p_out.splitlines():
         match = _LPSTAT_P_RE.match(line.strip())
         if not match:
@@ -127,7 +126,7 @@ def _parse_lpstat(p_out: str, default: Optional[str]) -> List[Dict]:
     return printers
 
 
-def _parse_default(d_out: Optional[str]) -> Optional[str]:
+def _parse_default(d_out: str | None) -> str | None:
     if not d_out:
         return None
     for line in d_out.splitlines():
@@ -158,11 +157,11 @@ def _collect_linux() -> Section:
 # macOS — system_profiler SPPrintersDataType
 # --------------------------------------------------------------------------- #
 
-def _parse_macos(out: str) -> List[Dict]:
+def _parse_macos(out: str) -> list[dict]:
     """Walk the indented printer headers, pulling Status / Default under each."""
     skip = {"Printers:"}
-    printers: List[Dict] = []
-    current: Optional[Dict] = None
+    printers: list[dict] = []
+    current: dict | None = None
     for raw in out.splitlines():
         line = raw.strip()
         if not line or line in skip:

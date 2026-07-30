@@ -6,7 +6,6 @@ classification, per-OS parsing, the nvidia-smi merge, and the never-raises
 guarantee.
 """
 
-import json
 
 import pytest
 
@@ -112,7 +111,7 @@ def test_linux_sysfs_fallback_when_no_lspci(monkeypatch, tmp_path):
 
 def test_linux_no_lspci_no_sysfs(monkeypatch, tmp_path):
     monkeypatch.setattr(gpu, "run_command", lambda *a, **k: None)
-    gpus, notes = gpu._enumerate_linux(str(tmp_path / "missing"))
+    gpus, _notes = gpu._enumerate_linux(str(tmp_path / "missing"))
     assert gpus is None
 
 

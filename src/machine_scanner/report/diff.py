@@ -21,21 +21,21 @@ from __future__ import annotations
 
 import html
 import json
-from typing import Any, Dict, List
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Compute  (pure — no rendering)
 # ---------------------------------------------------------------------------
 
 
-def _ordered_union(old: Dict[str, Any], new: Dict[str, Any]) -> List[str]:
+def _ordered_union(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
     """Keys of ``old`` in order, then keys only in ``new`` — deterministic."""
     keys = list(old.keys())
-    keys.extend(k for k in new.keys() if k not in old)
+    keys.extend(k for k in new if k not in old)
     return keys
 
 
-def _diff_value(path: str, old: Any, new: Any, out: List[Dict[str, Any]]) -> None:
+def _diff_value(path: str, old: Any, new: Any, out: list[dict[str, Any]]) -> None:
     """Recurse two values, appending field-level changes to ``out``."""
     if isinstance(old, dict) and isinstance(new, dict):
         for key in _ordered_union(old, new):
@@ -59,11 +59,11 @@ def _diff_value(path: str, old: Any, new: Any, out: List[Dict[str, Any]]) -> Non
         out.append({"path": path, "kind": "changed", "old": old, "new": new})
 
 
-def _sections_by_name(scan: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+def _sections_by_name(scan: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {s.get("name"): s for s in scan.get("sections", [])}
 
 
-def _section_brief(sec: Dict[str, Any]) -> Dict[str, Any]:
+def _section_brief(sec: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": sec.get("name"),
         "title": sec.get("title", sec.get("name")),
@@ -71,7 +71,7 @@ def _section_brief(sec: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def diff_scans(old: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
+def diff_scans(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
     """Compare two ``Inventory.to_dict()`` scans into a structured diff.
 
     Returns a dict with ``old_meta`` / ``new_meta`` and three buckets:
@@ -95,12 +95,12 @@ def diff_scans(old: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
         if name not in new_secs
     ]
 
-    changed: List[Dict[str, Any]] = []
+    changed: list[dict[str, Any]] = []
     for name, old_sec in old_secs.items():
         if name not in new_secs:
             continue
         new_sec = new_secs[name]
-        changes: List[Dict[str, Any]] = []
+        changes: list[dict[str, Any]] = []
         # Compare the meaningful section payload: status, data, notes.
         # (name/title are identity and excluded.)
         old_cmp = {
@@ -132,7 +132,7 @@ def diff_scans(old: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def has_changes(diff: Dict[str, Any]) -> bool:
+def has_changes(diff: dict[str, Any]) -> bool:
     """True if the diff contains any added / removed / changed section."""
     return bool(
         diff.get("sections_added")
@@ -154,13 +154,13 @@ def _fmt_scalar(value: Any) -> str:
     return str(value)
 
 
-def _meta_line(meta: Dict[str, Any]) -> str:
+def _meta_line(meta: dict[str, Any]) -> str:
     return f"{meta.get('hostname', '?')} @ {meta.get('scanned_at', '?')}"
 
 
-def diff_to_text(diff: Dict[str, Any]) -> str:
+def diff_to_text(diff: dict[str, Any]) -> str:
     """Render a diff structure as a plain-text report."""
-    out: List[str] = []
+    out: list[str] = []
     out.append("=" * 64)
     out.append("  machine_scanner — scan diff")
     out.append("=" * 64)
@@ -221,7 +221,7 @@ td.path{font-family:ui-monospace,Consolas,monospace;color:#37474f;white-space:no
 """
 
 
-def _row_cells(ch: Dict[str, Any]) -> str:
+def _row_cells(ch: dict[str, Any]) -> str:
     kind = ch["kind"]
     path = html.escape(ch["path"])
     if kind == "added":
@@ -240,7 +240,7 @@ def _row_cells(ch: Dict[str, Any]) -> str:
     )
 
 
-def diff_to_html(diff: Dict[str, Any]) -> str:
+def diff_to_html(diff: dict[str, Any]) -> str:
     """Render a diff structure as a single self-contained HTML page."""
     old_m = diff.get("old_meta", {})
     new_m = diff.get("new_meta", {})
@@ -248,7 +248,7 @@ def diff_to_html(diff: Dict[str, Any]) -> str:
     if not has_changes(diff):
         body = '<div class="none">No differences — the two scans are identical.</div>'
     else:
-        blocks: List[str] = []
+        blocks: list[str] = []
         for sec in diff.get("sections_added", []):
             blocks.append(
                 f'<div class="sec"><h2><span>{html.escape(sec["title"])} '

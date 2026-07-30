@@ -9,7 +9,6 @@ import pytest
 from machine_scanner.collectors import battery as b
 from machine_scanner.core.models import Status
 
-
 # --------------------------------------------------------------------------- #
 # Windows / Win32_Battery
 # --------------------------------------------------------------------------- #
