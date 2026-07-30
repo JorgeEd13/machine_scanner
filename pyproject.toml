@@ -75,6 +75,10 @@ known-first-party = ["machine_scanner"]
 # stronger check than a type-checker flag. 3.10 is the lowest mypy will take.
 python_version = "3.10"
 files = ["src"]
+# SCOPE, stated because it is easy to read this gate as broader than it is: only
+# `src/` is checked. Test code is NOT type-checked (running mypy over tests/ today
+# reports errors). Widening it is real work, not a flag flip, and is queued rather
+# than claimed. "mypy clean" here means "src/ is clean".
 ignore_missing_imports = true
 # Ratchet, not a wall: these are the levels the code passes TODAY and CI holds.
 # Tightening happens per-module (see [[tool.mypy.overrides]]) so the gate stays
