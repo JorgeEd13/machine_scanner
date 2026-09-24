@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write # needed to create the Release and upload assets
+  actions: write # needed to prune this repo's old build artifacts
 
 jobs:
   build:
@@ -115,3 +116,44 @@ jobs:
           files: artifacts/*
           generate_release_notes: true
           fail_on_unmatched_files: true
+
+  prune:
+    name: prune old artifacts
+    needs: [build, release]
+    # Runs even when `release` is skipped. A workflow_dispatch build produces
+    # artifacts and no release, and that is precisely how old builds pile up:
+    # every artifact still on this repo was from a manual run.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep only the two most recent builds
+        continue-on-error: true # housekeeping must never fail a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP_BUILDS: "2"
+        run: |
+          set -u
+          # Grouped by RUN, not by artifact: one build produces six
+          # artifacts (three platforms x two tools), so "keep the newest N
+          # artifacts" would leave an incomplete set from the newest build.
+          stale=$(gh api --paginate \
+            "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)]
+                  | group_by(.workflow_run.id // 0)
+                  | sort_by(.[0].created_at) | reverse
+                  | .['"${KEEP_BUILDS}"':] | flatten
+                  | .[] | "\(.id) \(.size_in_bytes) \(.name)"')
+          if [ -z "$stale" ]; then
+            echo "Nothing to prune (at most ${KEEP_BUILDS} builds kept)."
+            exit 0
+          fi
+          freed=0
+          while read -r id size name; do
+            [ -z "${id:-}" ] && continue
+            if gh api -X DELETE \
+                 "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}" >/dev/null 2>&1; then
+              echo "  pruned: ${name} ($(( size / 1048576 )) MB)"
+              freed=$(( freed + size ))
+            fi
+          done <<< "$stale"
+          echo "Freed $(( freed / 1048576 )) MB."
