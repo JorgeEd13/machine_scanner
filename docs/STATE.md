@@ -589,6 +589,37 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
     scan of the dev laptop, which has 2 partial sections, exits `2`); `_run_report` always
     returning `0` (its exit logic duplicates `main()`'s and only `main()`'s `ERROR` branch is
     tested); dropping `notes` from the diff comparison; ignoring `--json` in `--diff`.
+- **Study-block findings — R3-T11 (2026-10-03), `advisor/` (`fit`, `catalog`, `summary`).** Backlog
+  only; repo frozen. Measured against `8d529e9`, 317 tests; mutations run on a copy with
+  `PYTHONDONTWRITEBYTECODE=1` (a same-size, same-second edit reused a stale `.pyc`). Verdicts read
+  from `build_section`/`recommend` on synthetic inventories.
+  - **One memory route: more hardware can lower the verdict.** `usable_memory_gb` uses VRAM alone
+    whenever a discrete GPU above 1 GB is accepted, even when 80% of RAM is far larger. 16 GB RAM,
+    no GPU → `comfortable`, `qwen2.5:14b`; same box + a 2 GB `GeForce MX150` → `minimal`,
+    `qwen2.5:1.5b`. 64 GB RAM → `llama3.3:70b`; + an 8 GB RTX 4060 → `gemma2:9b`.
+    `advisor/requirements.py` accepts *either* route (`MEMORY_ROUTES`), so the qualifier and the
+    advisor disagree about the same machine; the monotonicity test compares two CPU-only boxes.
+    Consider both routes (with a speed note on the CPU one) and test monotonicity across the GPU path.
+  - **`"vega 6"` matches `Vega 64`.** `_is_integrated("AMD Radeon RX Vega 64", None)` → `True`
+    (substring, no word boundary); `"Radeon RX Vega 56"` → `False`. The discrete card is dropped and
+    the note says "integrated GPU ignored". Match tokens; add negative cases.
+  - **The licence filter has no discriminating test.** Removing `and row["commercial"]` from
+    `recommend()` leaves 317 green: the three licence tests that check `best` build 8 GB (the fourth, a
+    non-empty check, builds 64 GB); at 8 GB `qwen2.5:7b` wins either way. With the mutation, a 4 GB box gets `qwen2.5:3b` as `best`.
+    `test_excluding_it_does_not_leave_a_4gb_machine_without_a_recommendation` builds 8 GB. Run them
+    at 4 GB.
+  - **Permissive defaults on `ModelSpec`.** `licence="Apache-2.0"`, `commercial=True`; all four
+    Apache-2.0 entries rely on the default. Deleting `licence=` from `llama3.2:3b` relabels it
+    Apache-2.0 / commercial with 317 green — `test_every_model_carries_a_licence_name` checks
+    non-empty only. Make both fields required and pin the licence per tag in a test.
+  - **Test gaps (each leaves 317 green or is not discriminating).** `max(free)` → `sum(free)` for
+    free disk: green (every fixture has one partition); with two 3 GB partitions the sum yields
+    `gemma2:9b` (5.4 GB download), which fits neither. The hybrid-laptop test passes with the
+    integrated filter disabled (the iGPU fixture reports less than the discrete card).
+    `MEMORY_ROUTES` in `catalog.py` is never imported; `requirements.py` repeats `("vram", "ram")`.
+  - **Upstream note.** The catalog's source, `receivables-agent` `src/core/hardware.py`, has the same
+    9 tags with no licence fields and describes `qwen2.5:3b` as "solid tool-calling at 3B"; the
+    v0.2.1 licence fix did not flow back. Not measured whether its `auto` mode picks that model.
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
