@@ -677,6 +677,39 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
   - **Minor.** `qualifier._is_frozen()` has no caller (copied from `cli.py`). `_recommended` uses
     `r.get("commercial", True)` — fail-open for a row without the field (not reachable today: every
     `ModelSpec` row carries it).
+- **Study-block findings — R3-T14 (2026-10-03), `build/` specs + entrypoints, `release.yml`,
+  `ci.yml`, `collectors/_all.py` (ADR-018, ADR-021).** Backlog only; repo frozen. Measured against
+  `49e20dd`, 317 tests; mutations run on a `git archive` copy, each one frozen with PyInstaller 6.20
+  on Linux (Python 3.14 locally; the release uses 3.13). Artifact contents read with
+  `pyi-archive_viewer -l -r`.
+  - **The comments describe a mechanism that no longer exists.** `build/machine_scanner.spec`
+    L51–54 and `build/entrypoint.py` L7–9 say collectors register via imports in
+    `collectors/__init__`; since ADR-021 the manifest is `collectors/_all.py`. Spec L63–66 says that
+    without the `_all` hidden import "the frozen binary registers ZERO collectors": removing it gives
+    `ModuleNotFoundError` and exit 1 on `--list` and `--json`. ADR-018 still describes
+    `collectors/__init__.py` and 16 collectors with no pointer to ADR-021. Rewrite the comments; add a
+    dated addendum to ADR-018.
+  - **A collector dropped from `_all.py` ships silently.** Removing `usb` from `_all.py`: 317 passed;
+    the frozen scanner still contains the `usb` module (it is in `hiddenimports`) and `--list` prints
+    16 with exit 0. The only check that fails is the hard-coded `-ne 17` in the release smoke test,
+    which runs on tags only. The same 17 lives in three places with no shared owner (`_all.py`, the
+    scanner spec's `hiddenimports`, which no test reads, and the workflow literal). Add a unit test
+    that the registry equals the non-underscore modules in `collectors/`, and derive the smoke count.
+  - **CI never freezes.** `ci.yml` tests the source; no step runs `pyinstaller`, so a broken spec,
+    entrypoint or manifest merges green and surfaces at the next tag. `release.yml` does not run
+    pytest. Freeze at least the Linux binaries in the PR workflow (both built in about 13 s here).
+  - **The privacy claim is checked on the spec text, not on the artifact.**
+    `test_qualifier_spec_bundles_exactly_the_scope` parses the spec as a string; the release smoke
+    only checks that the qualifier prints a verdict. An artifact check is cheap and discriminates:
+    `strings <binary> | grep -c collectors.network` is 0 for the qualifier and 1 for the scanner.
+    Add an absence assertion for the excluded modules to the release smoke. (Scope of the claim, for
+    the README if it is ever stated more strongly: psutil itself is bundled.)
+  - **Minor.** `test_importing_a_collector_does_not_drag_in_the_others` imports only `cpu` and
+    checks 4 of the 12 excluded modules (`baseboard` is not among them; not measured). Removing the
+    `_all` line from the qualifier's `excludes` stays green (the test subtracts it) and leaves the
+    bundled module set identical, so the one exclude that defends against the costliest regression
+    has no guard. `ci.yml`'s lint job pins `checkout@v4`/`setup-python@v5` while the rest use
+    `@v5`/`@v6`. The version is three literals (`pyproject.toml`, `__init__.__version__`, the tag).
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
