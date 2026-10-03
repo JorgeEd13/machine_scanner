@@ -10,6 +10,14 @@ for the choices; F6's are ADR-019/020.
 
 ## Current focus (F6.1) — done
 
+> 🧊 **FROZEN for feature work since 2026-10-03 — study block open.** This repo was cut into
+> **14 territories** by the APROFUNDAMENTOS programme (`repo-base-career/sistema/APROFUNDAMENTOS_ROADMAP.md`
+> §R3). While the block is open, that programme reads this code line by line and measures its
+> guards by mutation, so a moving tree would invalidate the measurements. Findings from the study
+> go to this file's backlog rather than being fixed there. The freeze lifts when the R3 block
+> closes. It is a *convention*, not a mechanism — nothing enforces it; Jorge can lift it by saying so.
+
+
 **`ai-model-requirements-{windows.exe,linux,macos}`** — a second one-file binary
 for someone who was *sent* it and has no reason to trust it yet.
 
