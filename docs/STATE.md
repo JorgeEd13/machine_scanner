@@ -297,6 +297,26 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
 
 ## Next step
 
+- **Study-block findings — R3-T1 (2026-10-03).** Backlog only; the repo is frozen
+  (see top), so none of these is fixed yet. Measured against `38803b5`, 317 tests.
+  - **Status honesty.** `system` returns `ok` without psutil (no `boot_time` /
+    `uptime_hours`); `memory` returns `ok` with no note and no swap keys when
+    `swap_memory()` raises (`except Exception: pass`). `docs/ARCHITECTURE.md` defines
+    that as `partial` ("some fields"). `cpu`/`disk` also return `ok` with a field
+    missing (with a note); `network` returns `ok` with `primary_ip: null` and no note. `Section.status` defaults to `OK`, so forgetting reads as success.
+  - **`--only` typo.** `--only cpuu --json` → 0 sections, exit 0. `run_all(only=[])`
+    runs all 17 (empty list is falsy). Validate names at the CLI.
+  - **Per-collector time bound.** Isolation is `try/except` only: a collector that
+    blocks delays every later one, and psutil calls have no timeout (only
+    `run_command` does). "The scan always completes" holds for raising, not hanging.
+  - **`run_command` outcome.** Missing binary, timeout, non-zero exit and a str
+    argument containing a space (`"ls -l"`, read as one binary name) all return `None`; empty successful output
+    returns `""`. Callers cannot tell `unavailable` from `error`.
+  - **Test gaps.** Deleting `check=True` → 317 green. Widening the runner's catch to
+    `BaseException` → 317 green (Ctrl+C becomes an `ERROR` section and the scan
+    continues). `encoding="utf8"` (same codec) → red: the test asserts the keyword,
+    not decoding. A duplicate `@register` name is accepted silently and caught only
+    by `test_only_filters_collectors`.
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
