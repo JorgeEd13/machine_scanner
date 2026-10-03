@@ -492,6 +492,38 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
     the AC adapter, which sorts before `BAT1`); deleting the audio `no soundcards` branch (status
     unchanged, note lost); deleting the input trailing-block flush (the fixture's last block is
     dropped anyway); removing `@()`/`-InputObject` from `_PS_BAT` (no test reads the query string).
+- **Study-block findings — R3-T8 (2026-10-03), `storage_devices`.** Backlog only; repo
+  frozen. Measured against `e460c06`, 317 tests; mutations run on a copy.
+  - **Linux SMART: a failing disk loses its health.** per smartctl(8) EXIT STATUS, the exit code
+    is a bitmask (bit 3 = disk failing, bit 6 = error-log entries; documented, not observed —
+    `smartctl` is not installed on the test host), and `run_command`
+    returns `None` on any non-zero exit. Measured with a stub `smartctl` printing
+    `{"smart_status":{"passed":false}}`: exit 8 → `_smart_health_linux` returns `None`; the same
+    JSON with exit 0 → `"failed"`; `passed: true` with exit 64 → `None`. As root, `_collect_linux`
+    then returns `ok`, no `health`, note `SMART health unavailable (smartctl not installed?)`.
+    Fix needs `run_command` to expose the exit code (see R3-T1 entry).
+  - **Linux SMART loop stops at the first unreadable drive, at any position.** The comment says
+    "first probe". Stubbed, as root: unreadable USB `sda` listed before a readable `nvme0n1` →
+    health `[None, None]`, `ok`, note `smartctl not installed?`; without the `break` →
+    `[None, 'passed']`.
+  - **Windows SMART `partial` likely unreachable (inferred from the code, not run on Windows).**
+    `_PS_SMART` puts `-ErrorAction SilentlyContinue` inside the `@()`, so an access denial likely
+    prints `[]`, which yields no note and `ok`; `partial` needs `run_cim` to return `None`, i.e.
+    PowerShell itself failing. ADR-013 records "returned empty without admin … correctly did not
+    gate to PARTIAL" — that may be the blocked case. Confirm on a non-admin Windows run.
+  - **Windows: empty `MSFT_PhysicalDisk` result takes the fallback.** `if rows:` treats `[]` like
+    `None`. Stubbed `MSFT → []`, `Win32_DiskDrive → [1 disk]` → `ok` with note
+    `MSFT_PhysicalDisk unavailable; used Win32_DiskDrive …`, although the provider answered.
+  - **`health` has three vocabularies.** Windows `healthy`/`warning`/`unhealthy`, Linux
+    `passed`/`failed`, macOS the raw `diskutil` string (`Verified` in the test). Windows
+    predictive failure goes to a note, not the field.
+  - **Test gaps.** Each of these mutations leaves all 317 tests green: accepting lsblk
+    `type: "rom"` (the fixture's `sr0` is also caught by the `sr` name prefix; a `rom` named
+    `cdrom0` is then counted as a drive); `any(flags)` → `all(flags)` in
+    `_smart_predicts_failure` (two rows, one `PredictFailure: true` → `False`, note
+    `no imminent failure predicted`); deleting the SMART-loop `break`; `if rows:` →
+    `if rows is not None:` (the stub above then returns `unavailable`, no drives, no note). No
+    test has two SMART rows, an empty SMART result, `passed: false`, or a non-zero `smartctl` exit.
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
