@@ -772,6 +772,46 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
     on the HTML minimum cell keeps the suite green.
   - (read, not run) `release.yml` sets `contents: write`/`actions: write` at workflow level, so the
     build job that pip-installs and runs PyInstaller inherits them; consider per-job permissions.
+- **Study-block findings — R3-V1 (2026-10-03), blind VERIFY over the core and the collectors.**
+  Backlog only; repo frozen. Two blind reviewers with no docs: one ran the code (live and with
+  faked tool output), one mutated a copy (317 tests at baseline; that reviewer reported 25 of 39
+  semantic mutations green). Only what earlier study blocks had not logged:
+  - **V1-1 · The core isolates raises, not bad returns.** A collector that returns `None`, a
+    `dict`, or a `Section` whose status is a plain string is appended by `run_all`, and the whole
+    report then fails in `to_dict`. A collector module that fails at import aborts the scan before
+    any collector runs (`core/registry.py`). Validate the return type inside the isolation.
+  - **V1-2 · `lsblk` failure modes in `storage_devices`.** Unparseable `lsblk` output gives
+    `unavailable` with the note "via lsblk or /sys/block", but the `/sys/block` path is never
+    tried (on its own it finds this laptop's NVMe). A JSON list at the top level raises
+    `AttributeError` and the section becomes `error`.
+  - **V1-3 · More "exited non-zero" read as "missing".** `lspci` exiting 1 gives the note "lspci
+    not found, install it" (`gpu`); `bluetoothctl` answering with zero devices, or timing out after
+    5 s, gives "bluetoothctl unavailable" (`bluetooth`). Same root as the `run_command` entry above.
+  - **V1-4 · Zero CIM rows read as a failed query** also in `usb`, `memory_modules` and `gpu`
+    (beyond `monitors`/`audio`/`input`, logged earlier): `run_cim` returns `None` on empty output
+    and they report a CIM failure ("could not query/enumerate … via CIM"). Python side only,
+    measured with empty stdout.
+  - **V1-5 · Numeric hygiene.** `[N/A]` from `nvidia-smi` stays a string in numeric fields and a
+    broken `nvidia-smi` leaves no note; a VRAM of `nan`/`inf` raises on macOS (`system_profiler`); on
+    Windows `inf` raises and `NaN` is silently dropped (`gpu`). A Linux battery
+    named `CMB0` reads as no battery, and mixed `energy_*`/`charge_*` files yield a health of
+    1250 % (`battery`).
+  - **V1-6 · Report noise on Linux and Windows.** Snap's squashfs mounts are listed as partitions
+    at 100 % used (26 on the test laptop); `cpu.name` is `x86_64` on Linux; Windows USB root hubs
+    with no VID/PID are counted as devices.
+  - **V1-7 · Mutations in the core and simple collectors that keep the full suite green:** `disk`
+    returning `error` on its success path; `cpu`/`memory`/`network` filling the wrong field or
+    inverting `is_up`; `darwin` detected as `other`; `is_admin` inverted; `meta.elevated` forced
+    true; the registry dropping the one-line exception note. `test_no_psutil.py` only exercises the
+    psutil-absent branch; the `test_collect_never_raises_on_real_host` smoke tests assert only the
+    name and "not error"; `test_run_all_produces_a_section_per_collector` only counts sections.
+  - **V1-8 · Tests whose fixture makes the guard irrelevant:** the GPU sysfs connector node has no
+    `vendor` file, so the name filter can be removed; the trailing-block code in the Linux `input`
+    parser never runs (the last block is a webcam, dropped anyway); the "no queues"/"no
+    soundcards" branches of `printers`/`audio` return the same status as the generic path; the
+    `storage_devices` Win32 fallback test never asserts the status; `test_clean_scrubs_placeholders`
+    tests `baseboard`'s private copy; the shared `_smbios.clean` is only covered indirectly (the
+    `gpu`/`memory_modules`/`usb` tests go red when it is mutated).
 - **macOS is still unverified by a human.** The binary builds and passes its
   smoke test on the `macos-latest` runner, but nobody has double-clicked it.
   **Docker cannot help** — a container shares the host kernel and a Mach-O
