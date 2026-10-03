@@ -369,6 +369,31 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
     same row without `driver_version` gets it. Also applies to NVIDIA rows on Windows when
     `nvidia-smi` is absent. The `gpu` section still carries its own `AdapterRAM` note.
     Checked through `_pick_gpu` only.
+- **Study-block findings — R3-T4 (2026-10-03), `memory_modules`.** Backlog only; repo
+  frozen. Measured against `1c6c91c`, 317 tests; mutations run on a copy.
+  - **Memory-type table mixes two code spaces.** `_DDR_TYPES` is applied to
+    `SMBIOSMemoryType` (SMBIOS type-17 codes), but its 20 → `DDR` and 21 → `DDR2` entries
+    look like WMI's own `MemoryType` enum (per Microsoft's docs; not checked on Windows). Synthetic SMBIOS dumps decoded by `dmidecode 3.6`
+    give 18 = DDR, 19 = DDR2, 20 = DDR2 FB-DIMM, 21 = Reserved; `_type_label` returns
+    `type 18`, `type 19`, `DDR`, `DDR2`. Codes 24/26/34 agree, and those are the ones the
+    test samples. The table is not used on Linux, which passes `dmidecode`'s decoded string
+    through, so for codes 20/21 the two platforms disagree (`DDR2 FB-DIMM` / `Reserved` on
+    Linux). Fix: SMBIOS codes, plus a test case in the 18–21 range.
+  - **Apple Silicon docstring.** The module docstring says unified memory "reports as a
+    single entry with no slot"; with a stubbed Apple-Silicon-shaped `SPMemoryDataType` output
+    (`Memory: 16 GB` / `Type: LPDDR5`, no `DIMM`/`BANK` header; shape assumed, not captured
+    on a Mac) the collector returns `unavailable` with `modules: []`.
+  - **"Run as root" regardless of privilege.** The Linux no-output branch never calls
+    `is_admin()`: stubbed `is_admin() = True` + no output → the same "run as root" note. A
+    missing `dmidecode` or a timeout gives the same note (see R3-T1, `run_command` outcome).
+    `test_linux_needs_root_when_no_output` stubs `is_admin` to `False`, which that branch
+    never reads.
+  - **Linux fixture omits lines real `dmidecode` prints.** No `Bank Locator`, no
+    `Configured Memory Speed: Unknown`, no test with output present and non-root. Adding
+    `"Bank Locator": "slot"` to `_DMIDECODE_FIELDS` → 317 green, and on real `dmidecode`
+    output the slot becomes `BANK 0`. Dropping the `or current.get("speed_mhz")` fallback →
+    317 green, and with configured speed `Unknown` the speed becomes `None` (was 2667).
+    Deleting the non-root caveat note → 317 green.
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
