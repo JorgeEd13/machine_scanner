@@ -394,6 +394,44 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
     output the slot becomes `BANK 0`. Dropping the `or current.get("speed_mhz")` fallback →
     317 green, and with configured speed `Unknown` the speed becomes `None` (was 2667).
     Deleting the non-root caveat note → 317 green.
+- **Study-block findings — R3-T5 (2026-10-03), `usb` + `bluetooth`.** Backlog only; repo
+  frozen. Measured against `6bdbae3`, 317 tests; mutations run on a copy.
+  - **The sysfs-fallback note says "no device names", but the path reads them.**
+    `_collect_linux` (usb) adds `lsusb unavailable; read /sys/bus/usb (no device names)`,
+    while `_parse_sysfs_usb` reads each device's `product` and `manufacturer` files. On this
+    Linux host with `lsusb` stubbed out (host state at the time of the run): 10 devices, all
+    10 named, plus that note.
+  - **Bluetooth connection nodes counted as adapters.** `_read_sysfs_adapters` keeps every
+    entry whose name starts with `hci`. The kernel is understood to also create `hciX:<handle>` entries under
+    `/sys/class/bluetooth` for active connections (not captured or checked on this host); a tmp tree
+    with `hci0` + `hci0:3585` returns two adapters. The usb sysfs reader skips names with
+    `:`; this one has no such guard.
+  - **The Linux adapter address is never read on this host.** `_read_sysfs_adapters` reads
+    `/sys/class/bluetooth/hciX/address`; on this host `hci0` has no `address` file (observed
+    on kernel 7.0 / BlueZ 5.85; not checked on other kernels), so the adapter is reported as `{"name": "hci0"}` only. The tests create
+    an `address` file in their tmp tree, which this host's sysfs doesn't have.
+  - **Non-empty but unparseable tool output degrades silently** (one stubbed string per
+    collector; exit codes of the real tools in these cases not checked). `bluetoothctl` printing one
+    line that isn't a `Device` line (stubbed: `No default controller available`) → `ok`,
+    `device_count` 0, **no note**; the "no paired-device list" note only fires on empty
+    output. Same shape in usb: stubbed `lsusb` output that matches no line → `unavailable`
+    with no note and the sysfs fallback skipped.
+  - **Windows Bluetooth: unknown rows default to "adapter".** `_classify_windows` sends
+    anything that is neither `DEV_<mac>` nor `BTHENUM…` to `adapters`. Canned rows for the
+    radio plus four `BTH\MS_*` enumerator nodes (`MS_BTHBRB`, `MS_BTHLE`, `MS_RFCOMM`,
+    `MS_BTHPAN`; IDs written from Windows knowledge, not captured on a Windows host) →
+    `adapter_count` 5 for one radio.
+  - **Windows USB: composite-device interfaces listed as separate devices.** Rows under
+    `USB\VID_xxxx&PID_yyyy&MI_nn` share the parent's VID:PID; one parent + three `MI_`
+    rows (canned) → `count` 4, one distinct VID:PID. The Linux sysfs parser skips interface
+    (`:`) nodes, so the two OSes would likely count one composite device differently (inferred
+    from canned rows and a tmp sysfs tree; no real device counted on both).
+  - **Test gaps.** Each of these mutations leaves the 30 usb/bluetooth tests green: removing
+    the `:` interface guard in `_parse_sysfs_usb` (the `idVendor` check drops those nodes
+    anyway, and the test doesn't check that no file is read); widening the PowerShell
+    filter `-like 'USB\*'` → `-like '*USB*'` (no test reads the query string); replacing
+    the sysfs fallback in usb `_collect_linux` with `devices = []` (no test drives that
+    branch end-to-end).
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
