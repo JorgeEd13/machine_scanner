@@ -432,6 +432,37 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
     filter `-like 'USB\*'` → `-like '*USB*'` (no test reads the query string); replacing
     the sysfs fallback in usb `_collect_linux` with `devices = []` (no test drives that
     branch end-to-end).
+- **Study-block findings — R3-T6 (2026-10-03), `monitors` + `printers`.** Backlog only; repo
+  frozen. Measured against `8c5d71c`, 317 tests; mutations run on a copy.
+  - **Linux printers: CUPS running with no queues reports "cupsd not running".** On this host
+    (`cups` service active, no queues) `lpstat -p` prints `No destinations added.` and exits 1;
+    `run_command` returns `None` on any non-zero exit, so `collect()` returns `unavailable` with
+    the note `no CUPS / lpstat (printing not configured or cupsd not running)`. The
+    `no printers configured (CUPS has no destinations)` branch is only reached by the test that
+    stubs `lpstat -p` to an empty string.
+  - **Linux printers: `lpstat` output is localised; the parser only matches English.**
+    `run_command` does not pin the child's locale. The pt_BR catalog
+    `/usr/share/cups/locale/pt_BR/cups_pt_BR.po` translates `printer %s is idle…` →
+    `impressora %s está inativa…` (a second installed catalog, the langpack `cups.mo`, has
+    `impressora %s está ociosa…`; both start with `impressora`), and both translate
+    `system default destination: %s` → `destino padrão do sistema: %s`; real `lpstat` under `LANG=pt_BR.UTF-8` prints the
+    translated no-destinations message. A stubbed `impressora …` line → `unavailable`,
+    `no printers configured`. Not checked with a real configured queue under pt_BR. Likely fix:
+    `LC_ALL=C` for the child process, plus one translated fixture.
+  - **Monitors (Linux): name read only from descriptor `0xFC`.** This host's internal panel
+    (`eDP-1`, AUO, EDID 1.4) has its model `B156HAN15.2` in an `0xFE` (unspecified text)
+    descriptor and no `0xFC`; numeric serial is 0 and there is no `0xFF`. Reported as
+    manufacturer + product code only, no name.
+  - **Monitors (Windows): no `@()` / `-InputObject` wrapper, unlike `printers`.** Inferred from
+    the code (not run on Windows): zero `WmiMonitorID` rows likely print nothing → `run_cim`
+    returns `None` → note `could not query displays via CIM`. With `run_cim` stubbed to `[]`:
+    `unavailable` with no note at all (there is no explicit empty-rows branch).
+  - **Test gaps.** Each of these mutations leaves the 19 monitors/printers tests green:
+    widening the manufacturer letter check `code > 26` → `code > 31`; Linux printers
+    `default=(name == default) if default else None` → `default=(name == default)` (unknown
+    default reported as `false`); deleting the Windows printers `if not rows` branch (the test
+    asserts the status, not the note). Removing the empty-`edid` guard also stays green, but
+    that guard is redundant with the 128-byte length check.
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
