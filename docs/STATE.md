@@ -343,6 +343,32 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
   - **`run_cim` contract tests.** Dropping the single-object wrap is caught only by an
     encoding test (`test_run_cim_forces_utf8_prefix_and_strips_bom`); dropping the
     `isinstance(row, dict)` filter → 317 green. Collector tests stub `run_cim` out.
+- **Study-block findings — R3-T3 (2026-10-03), multi-vendor `gpu`.** Backlog only; repo
+  frozen. Measured against `45c0153`, 317 tests; mutations run on a copy.
+  - **Vendor classifier false positive.** `_classify_vendor` matches the tag `"ati"` as a
+    substring, so `"Microsoft Corporation"` and `"Oracle Corporation"` → `AMD`, and a stubbed
+    `lspci -mm` line `"3D controller" "Microsoft Corporation" "Basic Render Driver"` → vendor
+    `AMD`. Removing `"ati"` → 317 green (the AMD test case also contains `"amd"`). Fix: match
+    tokens with word boundaries; add a negative test case.
+  - **NVIDIA merge drops cards.** `collect()` discards *every* NVIDIA row from the generic
+    enumerator whenever `nvidia-smi` returns anything. Stubbed 2 enumerated NVIDIA cards + 1
+    `nvidia-smi` row → 1 card reported, status `ok`, no note. Fix: join on PCI bus id
+    (`--query-gpu=pci.bus_id`), or at least keep the surplus / add a note.
+  - **Partial enumeration reported as `ok`.** Generic enumerator fails (`None`) but
+    `nvidia-smi` works → `ok` with the "could not enumerate" note attached; non-NVIDIA
+    adapters are silently missing. Should be `partial`.
+  - **No test asserts on the `nvidia-smi` parser.** The `collect()` unit tests stub
+    `_query_nvidia` out; only the real-host smoke test runs it (on a host that has
+    `nvidia-smi`), and it asserts nothing about the parsed rows. Relaxing the
+    column check `!=` → `<` → 317 green, and a 6-column line then makes `zip(strict=True)`
+    raise `ValueError` out of `collect()`. `[N/A]` fields stay strings next to floats
+    (`temperature_c: '[N/A]'`).
+  - **Advisor ↔ `gpu` contract.** `advisor/fit.py` assumes a row with `driver_version` came
+    from `nvidia-smi`, but the Windows enumerator also sets `driver_version`. Stubbed CIM row
+    (AMD, `AdapterRAM` = 4 GiB − 1, a driver version) → `_pick_gpu` emits no 4 GB caveat; the
+    same row without `driver_version` gets it. Also applies to NVIDIA rows on Windows when
+    `nvidia-smi` is absent. The `gpu` section still carries its own `AdapterRAM` note.
+    Checked through `_pick_gpu` only.
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
