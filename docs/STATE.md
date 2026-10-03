@@ -645,6 +645,38 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
   - **Unknown tier falls into `recommended`.** `meets`, `target_text` and `Requirement.target` test
     `== "minimum"` and send everything else to `recommended`; `meets_tier(checks, "minimun")` equals
     the recommended result. `TIERS` is declared and never used — validate against it.
+- **Study-block findings — R3-T13 (2026-10-03), `qualifier.py` + `report/requirements_report.py`
+  (ADR-021, ADR-023).** Backlog only; repo frozen. Measured against `526b438`, 317 tests; mutations
+  run on a copy with `PYTHONDONTWRITEBYTECODE=1`. Report output read from `to_requirements_text` on
+  synthetic inventories built with the suite's own `_inv()`.
+  - **The `NOT YET` branch still names the unfiltered ceiling.** ADR-023 replaced `fitting[-1]` with
+    `_recommended(rows)` in `_prepare`, but `_range_lines` still sets `hi = fitting[-1]` and prints
+    "Once the {blocked} requirement is met, this machine would run {hi}". 16 GB RAM, 4 GB NVIDIA
+    GPU, 8 cores, 6 GB free → `>> NOT YET` + "…would run qwen2.5:3b" (research licence), with no
+    licence sentence. Not caught: `test_failing_machine_never_claims_a_recommended_model` looks for
+    "Best available to you", and the four licence tests use 500 GB free, which never reaches this
+    branch. Route the conditional advice through `_recommended`.
+  - **"No commercial model fits" reads as a hardware `NO`.** `_verdict` treats `best is None` like
+    a failed minimum; since ADR-023 `best` is commercial-only. Probe (32 GB, 500 GB, 8 cores, 4 GB
+    GPU, every advisor row forced to `commercial=False`) → `>> NO` + "cannot run a local AI model
+    well enough to be worth it"; the branch written for this case ("None of them is licensed for
+    ordinary business use") is unreachable, because `NO` returns first. Latent with the shipped
+    catalogue (the smallest model is Apache-2.0). Give the verdict a separate input for it.
+  - **`SCOPE_STATEMENT` says the tool "did not collect" the machine and user name.** `_build_meta()`
+    in `core/registry.py` calls `socket.gethostname()` and `getpass.getuser()` on every `run_all`;
+    `_scan()` pops both afterwards. Real `_scan()` with `gethostname` instrumented: 1 call, and
+    `hostname` absent from the final meta. Nothing leaves the process — the wording is stronger
+    than the code. Either say "did not record", or let the registry skip identity.
+  - **Two policy string lists are not checked against what they name.** `IDENTIFYING_META` →
+    `("hostname",)`: 317 green — `test_qualifier_strips_identifying_metadata` iterates the list it
+    guards (the requirements report prints only `os_detail`, so nothing leaks today; the scanner's general
+    text and HTML renderers do print `hostname`/`user`). `_SOFT_BLOCKERS` →
+    `("disk", "memory")`: 317 green and no behaviour change, because the check key is `"ram"`.
+    Switch metadata to an allowlist with an exact-keys assertion on `_scan()`; validate soft-blocker
+    keys against the existing `Check.key` values.
+  - **Minor.** `qualifier._is_frozen()` has no caller (copied from `cli.py`). `_recommended` uses
+    `r.get("commercial", True)` — fail-open for a row without the field (not reachable today: every
+    `ModelSpec` row carries it).
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
