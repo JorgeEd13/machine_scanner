@@ -556,6 +556,39 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
     (`test_env_c_locale_is_ignored` only asserts a non-empty string); deleting the "copy all JSON"
     button (`count("data-copy-json") >= 4` also counts the 2 occurrences inside `_JS`). No test file
     loads a browser or JS engine, so the JS (search, copy, expand/collapse) is untested.
+- **Study-block findings — R3-T10 (2026-10-03), `cli` exit codes + `report/diff`.** Backlog only;
+  repo frozen. Measured against `596bfe1`, 317 tests; mutations run on a copy. Exit codes read from
+  the real process (`python3 -m machine_scanner.cli …`), not only from in-process `main()`.
+  - **Exit `2` has three meanings; exit `1` is undocumented.** ADR-008 says `2` = a collector raised.
+    It is also argparse's usage-error code (`--bogus`, `--json --html`, `--diff a` → `2`) and
+    `_run_diff` returns `EXIT_COLLECTOR_ERROR` for a missing/malformed input file, where no collector
+    ran. `test_diff_missing_file_errors` pins that reuse. Document the full table (or move the
+    collector-error code out of argparse's range, e.g. `70`/`EX_SOFTWARE`), and add a few
+    `subprocess` tests — in-process tests cannot see argparse's `SystemExit(2)` or an uncaught `1`.
+  - **Diff input errors escape the `except`.** It catches `OSError` and `JSONDecodeError` only.
+    Valid JSON that is not a scan (`[]`, `{"sections": ["x"]}`) → `AttributeError` traceback, exit
+    `1`; a non-UTF-8 file → `UnicodeDecodeError` traceback, exit `1`; `-o` into a missing directory →
+    `FileNotFoundError` from `_emit` (no `try`), exit `1`. Same user error class, exit `2` or `1`.
+    Validate the scan shape at the boundary.
+  - **Conflicting flags are resolved silently by `if` order.** `--diff a b --report` runs a full
+    scan, writes the HTML report and opens the browser; the diff never runs. `--diff … --ollama`
+    ignores `--ollama`; `--only` is ignored by `--diff` and `--report`. Only `--json`/`--html` are
+    mutually exclusive. Consider subcommands or a mutually exclusive group over the modes.
+  - **Diff edge cases on hand-edited / foreign JSON.** Duplicate section names → last wins, the
+    first silently drops out; `1` vs `true` and `1` vs `1.0` compare equal (Python `==`, not JSON);
+    `meta` is not compared (a `version` change with identical sections → empty diff); a section
+    without `name` crashes `diff_to_html` (`html.escape(None)`) while text prints `None`.
+  - **Diff noise (design, not a bug).** Two real scans ~1 s apart are never identical: across 5 pairs,
+    2–7 changes in 1–3 sections, all telemetry (CPU frequency/usage, memory available/used/percent
+    and swap used, sometimes a GPU temperature). Positional
+    paths: one item prepended to a 5-item list → 6 changes. `--diff` always exits `0`;
+    `has_changes()` exists but the CLI does not use it — wiring it only helps once volatile fields
+    are separated from identity fields.
+  - **Test gaps.** Each leaves 317 green: counting `PARTIAL` as an error in `main()`
+    (`test_partial_scan_still_exits_zero` builds an `UNAVAILABLE` section; with the mutation a real
+    scan of the dev laptop, which has 2 partial sections, exits `2`); `_run_report` always
+    returning `0` (its exit logic duplicates `main()`'s and only `main()`'s `ERROR` branch is
+    tested); dropping `notes` from the diff comparison; ignoring `--json` in `--diff`.
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
