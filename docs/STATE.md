@@ -317,6 +317,32 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
     continues). `encoding="utf8"` (same codec) → red: the test asserts the keyword,
     not decoding. A duplicate `@register` name is accepted silently and caught only
     by `test_only_filters_collectors`.
+- **Study-block findings — R3-T2 (2026-10-03), `baseboard` + `_smbios`.** Backlog only;
+  repo frozen. Measured against `4765464`, 317 tests; mutations run on a copy.
+  - **`baseboard` duplicates `_smbios`.** It predates the helper and never migrated: its own
+    `_PLACEHOLDERS` (23 entries vs 24 — `"no module installed"` exists only in `_smbios`), its
+    own `_clean`, its own PowerShell call without `_strip_bom` or list normalization. A
+    BOM-prefixed output → `unavailable`; JSON `null` / `[]` / `[{}]` → `AttributeError` from
+    `.items()`, not caught by `except (ValueError, TypeError)`, so the runner records `error`
+    (the module docstring says it never raises for an expected-absent case). Expected to be
+    latent — a single `pscustomobject` should serialize as an object — but not checked on a real
+    PowerShell. Fix: use `_smbios.clean` / `run_cim`.
+  - **Array-valued CIM fields.** If a class returns two instances, PowerShell member
+    enumeration makes the field an array and `_clean` stringifies it: stubbed
+    `bios_vendor=["AMI","AMI"]` → `"['AMI', 'AMI']"`. Not observed on real hardware.
+  - **Linux privilege flag.** ADR-009 calls `PermissionError` the precise elevation signal;
+    the code decides by `is_admin()`, and `blocked_by_privilege` only changes the outcome when
+    root is blocked. Removing it → 317 green; no test creates a mode-0400 file (the PARTIAL
+    test uses an absent file).
+  - **macOS synthesized `"Apple"`.** `setdefault` runs before the status decision, so any
+    non-empty `system_profiler` output yields identity: an error line → `ok` with only
+    `system_manufacturer` (admin), or `partial` with an elevation note that is wrong (non-admin).
+  - **Placeholder coverage.** Tests exercise 7 of the 23 `baseboard` entries. Removing
+    `"base board serial number"` → 317 green, and the leaked placeholder then counts as a
+    readable serial, which suppresses the elevation note (`ok`, no notes, unprivileged).
+  - **`run_cim` contract tests.** Dropping the single-object wrap is caught only by an
+    encoding test (`test_run_cim_forces_utf8_prefix_and_strips_bom`); dropping the
+    `isinstance(row, dict)` filter → 317 green. Collector tests stub `run_cim` out.
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
