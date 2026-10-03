@@ -524,6 +524,38 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
     `no imminent failure predicted`); deleting the SMART-loop `break`; `if rows:` →
     `if rows is not None:` (the stub above then returns `unavailable`, no drives, no note). No
     test has two SMART rows, an empty SMART result, `passed: false`, or a non-zero `smartctl` exit.
+- **Study-block findings — R3-T9 (2026-10-03), renderers + `report_name`.** Backlog only; repo
+  frozen. Measured against `6dc66ac`, 317 tests; mutations run on a copy. No browser was opened.
+  - **Self-containment test misses CSS and scheme case.** `test_html_is_self_contained_no_external_assets`
+    bans the substrings `http://` / `https://` and allowlists `data:` only for quoted `src`/`href`.
+    Adding `@import url(HTTPS://fonts.googleapis.com/css2?family=Inter);` to `_CSS` → 317 green
+    (URL schemes are case-insensitive; CSS `@import`/`url()` is not an attribute). A quoted
+    `<link href='//cdn…'>` is caught. Pin ADR-015 behaviourally: extract every URL from HTML and CSS
+    and allowlist `data:`, or load the file headless with the network blocked.
+  - **Notes: text drops the traceback; an empty note crashes both renderers.** `text_report` and
+    `html_report` print `note.splitlines()[0]`; the text comment says "indent the first line only"
+    but the rest is discarded. For an `ERROR` section the runner's second note renders as
+    `! Traceback (most recent call last):` — file and line lost (HTML keeps the full note in the
+    copy-JSON payload and search index). A note `""` → `IndexError` in `to_text` and `to_html`.
+    Latent: the runner's note is never empty.
+  - **`<pre>` fallback in `html_report._render_value` is unreachable through `to_html`.** `_card` calls `json.dumps`
+    on the section before rendering, so a non-JSON value (e.g. a `set`) raises `TypeError` and the
+    whole report fails; every JSON-serializable type is handled earlier. Text renders the same `set`
+    as its repr.
+  - **Text and HTML renderers diverge.** Same input: `None` → `None` / empty / JSON `null`; empty
+    dict → bare `key:` / `(empty)`; `[[1, 2], [3]]` → three flat bullets in text (grouping lost) /
+    one list per group in HTML. `_is_mapping` / `_is_list` are duplicated; `_section_dict`
+    re-implements `Section.to_dict()`. No test compares formats.
+  - **Language detection precedence.** Reads `LC_ALL, LC_MESSAGES, LANG, LANGUAGE` and skips `C`:
+    `LC_ALL=C LANG=pt_BR.UTF-8` → `pt`; `LANGUAGE=pt_BR:en LANG=en_US.UTF-8` → `en`. glibc/gettext
+    would give the C locale and `pt` respectively. Filename only, so low priority.
+  - **`brand.MARK_IMG` is unused.** `requirements_report.py` rebuilds the same `<img>` from
+    `MARK_B64`. The `brand.py` docstring says the page header shows the mark; `to_html` has none.
+  - **Test gaps.** Each leaves 317 green: the CSS `@import` above; removing `html.escape` from HTML
+    value cells (no test puts `<`/`&` in data); deleting the `C`/`POSIX` skip in `_lang_from_env`
+    (`test_env_c_locale_is_ignored` only asserts a non-empty string); deleting the "copy all JSON"
+    button (`count("data-copy-json") >= 4` also counts the 2 occurrences inside `_JS`). No test file
+    loads a browser or JS engine, so the JS (search, copy, expand/collapse) is untested.
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
