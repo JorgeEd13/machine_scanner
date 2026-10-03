@@ -734,6 +734,44 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
   Verified live on a real Windows box afterwards: the 8 GB machine now reads
   `YES, WITH LIMITS`, the RAM row shows `8 GB` with `reports 7.9 GB` beneath it,
   and the em dash arrives as `&#8212;` and renders correctly in the browser.
+- **Study-block findings — R3-V2 (2026-10-03), blind VERIFY over the output, advisor and
+  distribution code.** Backlog only; repo frozen. Two blind reviewers with no docs: one ran the
+  code, one mutated a copy (317 tests at baseline; that reviewer reported 25 of 26 mutations
+  green). Every item below was re-run by a separate audit before this entry. Only
+  what earlier study blocks had not logged:
+  - **V2-1 · Two entry points, two verdicts on one scan.** 8 GB, no GPU: the qualifier says
+    "YES, WITH LIMITS … a smaller and slower one", `--ollama` says COMFORTABLE, both naming
+    `qwen2.5:7b`. 32 GB RAM + a 1.5 GB discrete GPU: the qualifier says YES "comfortably", names
+    `qwen2.5:0.5b` and prints its own "confidently and WRONGLY" warning under it; `--ollama` says
+    MINIMAL. The requirement bars pass on RAM while `fit` sizes on VRAM.
+  - **V2-2 · Catalog descriptions contradict the sizing numbers.** `qwen2.5:7b` says "~10 GB RAM"
+    (code uses 6.25), `gemma2:9b` "~12 GB" (8.75), `qwen2.5:14b` "~16 GB VRAM" (10),
+    `llama3.3:70b` "64 GB+" (52.5). The report prints the description.
+  - **V2-3 · Free disk is the max over all partitions, removable ones included.** C: with 3 GB free
+    and a USB stick with 120 GB → YES, "120 GB free". `max(free)` → `min(free)` also keeps the
+    suite green.
+  - **V2-4 · "4 cores" counts logical cores** (a 2-core/4-thread CPU passes). Dropping `cores` from
+    `others_ok` (`advisor/requirements.py` L198) keeps the suite green.
+  - **V2-5 · The qualifier's scope has no test.** `run_all(only=SCOPE)` → `only=None` keeps the suite
+    green: the stub in `test_qualifier_strips_identifying_metadata` ignores `only`. Not a leak today
+    (a live run left user name and hostname out); the scope is guarded only by the spec's `excludes`.
+  - **V2-6 · `--only` drops unknown names silently** (`--only cpu,memroy` → just `cpu`, exit 0), and
+    `ollama_fit` is missing from `--list` yet must be named in `--only` to keep the verdict. The CLI
+    `_stub_scan` ignores `only`, so `run_all(only=None)` keeps the suite green.
+  - **V2-7 · "Next to the binary" is the working directory.** `cli.py` L13–15 promises it; the code
+    writes `Path(filename)` to the cwd (reproduced with `sys.frozen=True` and the executable in
+    another folder). A double-click on macOS or some Linux file managers starts in `$HOME` or `/`.
+  - **V2-8 · Renderer and advisor mutations that stay green:** text report without status marks,
+    without note lines, or with `repr` list items; every HTML badge "ok"; per-section copy payload
+    `{}`; first discrete GPU instead of the largest; the "memory but not disk" note disabled.
+  - **V2-9 · The diff has no direction test.** Swapping `old -> new`, `removed`↔`added`, or
+    "section removed"↔"added" keeps the suite green; `test_text_renderer_shows_changes` checks
+    `"4"` and `"8"`, never their order.
+  - **V2-10 · Qualifier text and file handling.** `--text` prints "This page was written to your
+    computer" without writing anything; `-o` overwrites an existing file without asking. Forcing ✓
+    on the HTML minimum cell keeps the suite green.
+  - (read, not run) `release.yml` sets `contents: write`/`actions: write` at workflow level, so the
+    build job that pip-installs and runs PyInstaller inherits them; consider per-job permissions.
 - **macOS is still unverified by a human.** The binary builds and passes its
   smoke test on the `macos-latest` runner, but nobody has double-clicked it.
   **Docker cannot help** — a container shares the host kernel and a Mach-O
