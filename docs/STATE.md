@@ -463,6 +463,35 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
     default reported as `false`); deleting the Windows printers `if not rows` branch (the test
     asserts the status, not the note). Removing the empty-`edid` guard also stays green, but
     that guard is redundant with the 128-byte length check.
+- **Study-block findings — R3-T7 (2026-10-03), `audio` + `input` + `battery`.** Backlog only;
+  repo frozen. Measured against `5e1ed4e`, 317 tests; mutations run on a copy.
+  - **Linux input: anything with a `kbd` handler is a "keyboard".** `_classify` keys on
+    `H: Handlers=kbd*`, which means "emits key codes", not "is a keyboard". On this host
+    (`collect()` live): 14 entries where the host has 4 input devices (built-in keyboard,
+    touchpad, USB keyboard, USB mouse — identified by name and `Phys` path) — 11 `keyboard` (two `Power Button`, `Video Bus`, `Acer WMI hotkeys`,
+    `Acer Wireless Radio Control`, the USB keyboard twice plus its Consumer/System Control
+    interfaces, the gaming mouse's keyboard interface, and the AT keyboard), of which 2 are
+    keyboards by name and `Phys` path; 3 `pointing`, where the touchpad appears as both `… Mouse` and `… Touchpad`. The
+    test fixture asserts `("keyboard", "Power Button")`, so the test encodes the behaviour.
+    Likely fix: classify by the `B: KEY=` capability bitmap (letter keys present), as udev does.
+  - **Battery: `present: False` is written when presence is unknown.** With `run_cim` stubbed to
+    `None`: `unavailable`, `{"present": False}`, note `could not query Win32_Battery via CIM`;
+    with an unknown OS: `unsupported`, `{"present": False}`. The macOS empty-output branch does the
+    same (from the code). The `@()`/`-InputObject` wrapper separates "no battery" from "query
+    failed" at the PowerShell layer, and the failure `Section` merges them again in `data`.
+    Likely fix: omit `present` (or `null`) on the failure and unsupported paths.
+  - **Battery: only the first battery is reported.** Linux takes `bats[0]`, Windows `rows[0]`.
+    Fixture with `BAT0` capacity 40 and `BAT1` capacity 90 → `ok`, `charge_percent: 40`, no note.
+    Windows not run.
+  - **Windows audio/input: no `@()` + `-InputObject` serialization, unlike `battery`.** Inferred
+    from the code (not run on Windows): zero rows likely print nothing → `run_cim` returns `None` →
+    note `could not query …` on a box that simply has no such device. Same pattern as the
+    `monitors` entry above. `_PS_INPUT` uses `@()` only to concatenate, then pipes.
+  - **Test gaps.** Each of these mutations leaves all 317 tests green: battery glob
+    `"BAT*"` → `"*"` (on this host `collect()` then reports `{'present': True, 'name': 'ACAD'}` —
+    the AC adapter, which sorts before `BAT1`); deleting the audio `no soundcards` branch (status
+    unchanged, note lost); deleting the input trailing-block flush (the fixture's last block is
+    dropped anyway); removing `@()`/`-InputObject` from `_PS_BAT` (no test reads the query string).
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
