@@ -620,6 +620,31 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
   - **Upstream note.** The catalog's source, `receivables-agent` `src/core/hardware.py`, has the same
     9 tags with no licence fields and describes `qwen2.5:3b` as "solid tool-calling at 3B"; the
     v0.2.1 licence fix did not flow back. Not measured whether its `auto` mode picks that model.
+- **Study-block findings — R3-T12 (2026-10-03), `advisor/requirements.py` + `collectors/llm_runtime.py`
+  (ADR-022).** Backlog only; repo frozen. Measured against `50441ad`, 317 tests; mutations run on a
+  copy with `PYTHONDONTWRITEBYTECODE=1`. Verdicts read from `evaluate`/`meets_tier`/`failing`/
+  `to_requirements_text` on synthetic inventories built with the suite's own `_inv()`.
+  - **The RAM slack is proportional; the reservation it tolerates is not.** `_RAM_REPORTING_SLACK =
+    0.88` allows 1.92 GB below a 16 GB sticker but 0.96 GB below 8 GB — the minimum bar.
+    `nominal_ram_gb(7.0)` → `7.0` (report: `NO`, with a 1 GB AMD iGPU fixture, 500 GB free, 8 cores);
+    `nominal_ram_gb(15.0)` → `16` (`YES`). `5.9` is displayed as `"6 GB"`, a sale size inferred, not
+    read. The code comment justifies 12% by the worst case seen (a 16 GB laptop, ~9%), not by the 8 GB bar. Not
+    measured: real iGPU reservation sizes on 8 GB machines. Consider an absolute allowance, or the
+    installed size from the memory modules where readable.
+  - **Two policy relaxations leave 317 green.** Slack `0.88` → `0.80`: green, and 6.5 GB then reads
+    `"8 GB"` and clears the minimum (the only lower-edge test uses 6.32, outside both values).
+    `disk_requirement(inventory, "recommended")` → `"minimum"` in `evaluate`: green, and 9 GB free
+    clears the 10 GB recommended bar (every disk test uses the minimum tier). Add boundary tests at
+    7.03/7.04 GB and one recommended-tier disk test.
+  - **"Could not read" gets three different answers.** `Check.meets` fails `None`: 32 GB RAM,
+    500 GB free and no `cpu` section → `>> NO`, `failing` names `cores`; with no `disk` section →
+    `>> NOT YET`; `fit.py` ignores unknown cores. `disk_requirement` errs the other way (no
+    `llm_runtime` section → no install cost). A buyer-facing `NO` should not come from a collector
+    that failed — give unknowns their own wording. Related, not measured against a consumer:
+    `Check.to_dict` publishes per-row `meets_*` without the two-route memory rule.
+  - **Unknown tier falls into `recommended`.** `meets`, `target_text` and `Requirement.target` test
+    `== "minimum"` and send everything else to `recommended`; `meets_tier(checks, "minimun")` equals
+    the recommended result. `TIERS` is declared and never used — validate against it.
 - ✅ **`v0.2.2` (2026-07-21) — licence names by VERSION.** `v0.2.1` recorded a
   licence per model but named the Llama ones generically. **There is no single
   "Llama Community License": 3.1, 3.2 and 3.3 are separate agreements**, with
