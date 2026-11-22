@@ -812,6 +812,17 @@ smoke run. Was 24 tests; CI observed green (run 27347587254).
     `storage_devices` Win32 fallback test never asserts the status; `test_clean_scrubs_placeholders`
     tests `baseboard`'s private copy; the shared `_smbios.clean` is only covered indirectly (the
     `gpu`/`memory_modules`/`usb` tests go red when it is mutated).
+- **Study-block findings — R3-P (2026-11-21), handout test.** Backlog only; repo frozen.
+  Two items no earlier study block had logged:
+  - **P-1 · `zip(strict=True)` breaks `gpu` on Python 3.9.** `pyproject.toml` declares
+    `requires-python = ">=3.9"` and the CI matrix lists 3.9, but `strict=` only exists from 3.10.
+    Measured in a `python:3.9-slim` container with `run_command` stubbed to one 5-field
+    `nvidia-smi` line: the `gpu` section is `error`, `TypeError: zip() takes no keyword arguments`.
+    The tests do not reach it: `test_gpu.py` replaces `_query_nvidia`, the other GPU tests feed
+    `lspci` text, and mypy targets 3.10 (the installed mypy cannot target 3.9 at all).
+  - **P-2 · `_size_to_gb` reads any unit it does not know as GB.** Only `MB`/`MiB` and `TB`/`TiB`
+    are converted, so `"512 kB"` → `512.0` (measured). How often real `dmidecode` output uses a unit
+    other than MB/GB was not measured; add the unit or return `None` for unknown units.
 - **macOS is still unverified by a human.** The binary builds and passes its
   smoke test on the `macos-latest` runner, but nobody has double-clicked it.
   **Docker cannot help** — a container shares the host kernel and a Mach-O
